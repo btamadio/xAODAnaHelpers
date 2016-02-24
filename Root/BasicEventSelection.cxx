@@ -258,12 +258,17 @@ EL::StatusCode BasicEventSelection :: histInitialize ()
   }
 
   // write the metadata hist to this file so algos downstream can pick up the pointer
-  TFile *fileMD = wk()->getOutputFile ("metadata");
+  TFile *fileMD = wk()->getOutputFile ("tree");
   fileMD->cd();
 
   // event counts from meta data
   if ( !m_histEventCount ) {
-    m_histEventCount = new TH1D("MetaData_EventCount", "MetaData_EventCount", 6, 0.5, 6.5);
+    std::string mdHistName = "MetaData_EventCount";
+    if(m_isMC){
+      mdHistName += "_";
+      mdHistName += wk()->metaData()->castString("dsid");
+    }
+    m_histEventCount = new TH1D(mdHistName.c_str(),mdHistName.c_str(), 6, 0.5, 6.5);
     m_histEventCount -> GetXaxis() -> SetBinLabel(1, "nEvents initial");
     m_histEventCount -> GetXaxis() -> SetBinLabel(2, "nEvents selected");
     m_histEventCount -> GetXaxis() -> SetBinLabel(3, "sumOfWeights initial");

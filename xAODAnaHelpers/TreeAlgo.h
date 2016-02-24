@@ -17,6 +17,7 @@ public:
   bool m_outHistDir;
 
   // holds bools that control which branches are filled
+  double m_weight_xs;
   std::string m_evtDetailStr;
   std::string m_trigDetailStr;
   std::string m_jetTrigDetailStr;

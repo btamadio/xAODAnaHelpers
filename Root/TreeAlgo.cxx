@@ -26,7 +26,7 @@ TreeAlgo :: TreeAlgo (std::string className) :
     m_helpTree(nullptr)
 {
   this->SetName("TreeAlgo"); // needed if you want to retrieve this algo with wk()->getAlg(ALG_NAME) downstream
-
+  m_weight_xs = 1;
   m_evtDetailStr            = "";
   m_trigDetailStr           = "";
   m_jetTrigDetailStr        = "";
@@ -72,7 +72,7 @@ EL::StatusCode TreeAlgo :: initialize ()
   Info("initialize()", m_name.c_str());
   m_event = wk()->xaodEvent();
   m_store = wk()->xaodStore();
-
+  m_weight_xs=0;
   this->treeInitialize();
   return EL::StatusCode::SUCCESS;
 }
@@ -179,12 +179,14 @@ EL::StatusCode TreeAlgo :: execute ()
   const xAOD::EventInfo* eventInfo(nullptr);
   RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(eventInfo, m_eventInfoContainerName, m_event, m_store, m_verbose) ,"");
   const xAOD::VertexContainer* vertices(nullptr);
-  RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(vertices, "PrimaryVertices", m_event, m_store, m_verbose) ,"");
+  const xAOD::Vertex* primaryVertex(nullptr);
+  if(wk()->metaData()->castDouble("no_vtx",0)==0){
+    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(vertices, "PrimaryVertices", m_event, m_store, m_verbose) ,"");    
+    primaryVertex = HelperFunctions::getPrimaryVertex( vertices );
+  }
   // get the primaryVertex
-  const xAOD::Vertex* primaryVertex = HelperFunctions::getPrimaryVertex( vertices );
-
-  m_helpTree->FillEvent( eventInfo, m_event );
-
+  m_weight_xs = wk()->metaData()->castDouble("weight_xs",1);  
+  m_helpTree->FillEvent( eventInfo, m_event, m_weight_xs);
   // Fill trigger information
   if ( !m_trigDetailStr.empty() )    {
     m_helpTree->FillTrigger( eventInfo );
@@ -210,7 +212,12 @@ EL::StatusCode TreeAlgo :: execute ()
   if ( !m_jetContainerName.empty() ) {
     const xAOD::JetContainer* inJets(nullptr);
     RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inJets, m_jetContainerName, m_event, m_store, m_verbose) ,"");
-    m_helpTree->FillJets( inJets, HelperFunctions::getPrimaryVertexLocation(vertices) );
+    if(wk()->metaData()->castDouble("no_vtx",0)==0){
+      m_helpTree->FillJets( inJets, HelperFunctions::getPrimaryVertexLocation(vertices) );
+    }
+    else{
+      m_helpTree->FillJets( inJets, 0 );
+    }
   }
   if ( !m_fatJetContainerName.empty() ) {
     const xAOD::JetContainer* inFatJets(nullptr);

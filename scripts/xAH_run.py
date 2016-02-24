@@ -25,6 +25,19 @@ import subprocess
 import sys
 import datetime
 import time
+import pprint
+import pyAMI.client
+import pyAMI.atlas.api as AtlasAPI
+from pyAMI.atlas.api import get_dataset_info
+
+def getInfoFromAMI(ds):
+  client = pyAMI.client.Client('atlas')
+  AtlasAPI.init()
+  d=AtlasAPI.get_dataset_info(client,ds)[0]
+  filtEff=float(d['genFiltEff'])
+  xsec=float(d['crossSection'])
+  dsid=str(d['datasetNumber'])
+  return (dsid,xsec*filtEff)
 
 # think about using argcomplete
 # https://argcomplete.readthedocs.org/en/latest/#activating-global-completion%20argcomplete
@@ -93,7 +106,9 @@ parser.add_argument('--inputTag', dest='inputTag', default="", help='A wildcarde
 parser.add_argument('--inputDQ2', dest='use_scanDQ2', action='store_true', help='If enabled, will search using DQ2. Can be combined with `--inputList`.')
 parser.add_argument('--inputEOS', action='store_true', dest='use_scanEOS', default=False, help='If enabled, will search using EOS. Can be combined with `--inputList and inputTag`.')
 parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0, help='Enable verbose output of various levels. Can increase verbosity by adding more ``-vv``. Default: no verbosity')
-
+parser.add_argument('-d','--dsName',dest='dsName',help='Specify dataset name to get from AMI')
+parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
+parser.add_argument('--private',dest='isPrivate',action='store_true',default=False,help='Indicate that Herwig++ multijet sample is being submitted, which requires a different datset name submitted to AMI')
 # first is the driver
 drivers_parser = parser.add_subparsers(prog='xAH_run.py', title='drivers', dest='driver', description='specify where to run jobs')
 direct = drivers_parser.add_parser('direct',
@@ -282,7 +297,7 @@ if __name__ == "__main__":
         xAH_logger.info("\t\tAdding samples using scanEOS")
       else:
         xAH_logger.info("\t\tAdding samples using scanDir")
-
+    sampleNameList=[]
     for fname in args.input_filename:
       if args.use_inputFileList:
         if (args.use_scanDQ2 or use_scanEOS):
@@ -292,6 +307,7 @@ if __name__ == "__main__":
               if not line.strip()     : continue
               if args.use_scanDQ2:
                 ROOT.SH.scanDQ2(sh_all, line.rstrip())
+                sampleNameList.append(line.rstrip())
               elif use_scanEOS:
                 base = os.path.basename(line)
                 ROOT.SH.ScanDir().sampleDepth(0).samplePattern(args.eosDataSet).scanEOS(sh_all,base)
@@ -300,9 +316,9 @@ if __name__ == "__main__":
         else:
           ROOT.SH.readFileList(sh_all, "sample", fname)
       else:
-
         if args.use_scanDQ2:
           ROOT.SH.scanDQ2(sh_all, fname)
+          sampleNameList.append(fname.rstrip())
         elif use_scanEOS:
           newEOS = True
           if not newEOS:
@@ -333,7 +349,6 @@ if __name__ == "__main__":
     if not args.use_scanDQ2:
       for dataset in sh_all:
         xAH_logger.info("\t\t%d files in %s", dataset.numFiles(), dataset.name())
-    sh_all.printContent()
 
     if len(sh_all) == 0:
       xAH_logger.info("No datasets found. Exiting.")
@@ -343,6 +358,28 @@ if __name__ == "__main__":
     sh_all.setMetaString( "nc_tree", args.treeName)
     #sh_all.setMetaString( "nc_excludeSite", "ANALY_RAL_SL6");
     sh_all.setMetaString( "nc_grid_filter", "*");
+    pList = []
+    if args.dsName:
+      sampleNameList=[args.dsName]
+    elif args.isPrivate:
+      dot = '.'
+      und = '_'
+      pList = [sampleName[:-1] for sampleName in sampleNameList]
+      sampleNameList=['mc15_13TeV.'+dot.join(sampleName.split(dot)[2:]) for sampleName in sampleNameList]
+      sampleNameList=[und.join(sampleName.split(und)[:-3])+'/' for sampleName in sampleNameList]
+    if args.is_MC:
+      if not args.isPrivate:
+        pList =['mc15_13TeV.'+sampleName.split('.')[1]+'.*' for sampleName in sampleNameList]
+      for i in range(len(pList)):
+        (dsid,weight_xs) = getInfoFromAMI(sampleNameList[i])
+        sh_all.setMetaString(pList[i],'dsid',dsid)
+        sh_all.setMetaDouble(pList[i],'weight_xs',weight_xs)
+        print('datasetNumber = ',dsid,'weight_xs = ',weight_xs)
+      print('Found sample: ',)
+      sh_all.findByName(pList[0]).printContent()
+      if args.no_vtx:
+        sh_all.setMetaDouble('no_vtx',1)
+    sh_all.printContent()
 
     # read susy meta data (should be configurable)
     xAH_logger.info("reading all metadata in $ROOTCOREBIN/data/xAODAnaHelpers/metadata")

@@ -87,7 +87,7 @@ public:
   TrigConf::xAODConfigTool*    m_trigConfTool;
   Trig::TrigDecisionTool*      m_trigDecTool;
 
-  void FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* event = nullptr );
+  void FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* event = nullptr, float w_xs=1);
 
   void FillTrigger( const xAOD::EventInfo* eventInfo );
   void FillJetTrigger();
@@ -209,6 +209,8 @@ protected:
   int m_mcEventNumber;
   int m_mcChannelNumber;
   float m_mcEventWeight;
+  float m_weight_xs;
+  float m_weight;
   float m_weight_pileup;
   float m_correct_mu;
   int   m_rand_run_nr;
@@ -548,8 +550,24 @@ protected:
   std::vector<float> m_fatjet_E;
 
   // substructure
-  std::vector<float> m_fatjet_tau32_wta;
-
+  std::vector<float> m_fatjet_tau1;
+  std::vector<float> m_fatjet_tau2;
+  std::vector<float> m_fatjet_tau3;
+  std::vector<float> m_fatjet_tau1_wta;
+  std::vector<float> m_fatjet_tau2_wta;
+  std::vector<float> m_fatjet_tau3_wta;
+  std::vector<float> m_fatjet_Split12;
+  std::vector<float> m_fatjet_Split23;
+  std::vector<float> m_fatjet_Split34;
+  std::vector<float> m_fatjet_ZCut12;
+  std::vector<float> m_fatjet_ZCut23;
+  std::vector<float> m_fatjet_ZCut34;
+  std::vector<float> m_fatjet_Mu12;
+  std::vector<float> m_fatjet_ThrustMin;
+  std::vector<float> m_fatjet_ThrustMaj;
+  std::vector<float> m_fatjet_Sphericity;
+  std::vector<float> m_fatjet_Aplanarity;
+  std::vector<float> m_fatjet_KtDR;
   // muons
   int m_nmuon;
 
