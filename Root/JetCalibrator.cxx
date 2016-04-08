@@ -71,9 +71,9 @@ JetCalibrator :: JetCalibrator (std::string className) :
 
   // when running data "_Insitu" is appended to this string
   m_calibSequence           = "JetArea_Residual_Origin_EtaJES_GSC";
-  m_calibConfigFullSim      = "JES_MC15Prerecommendation_April2015.config";
-  m_calibConfigAFII         = "JES_Prerecommendation2015_AFII_Apr2015.config";
-  m_calibConfigData         = "JES_MC15Prerecommendation_April2015.config";
+  m_calibConfigFullSim      = "JES_2015dataset_recommendation_Feb2016.config";
+  m_calibConfigAFII         = "JES_MC15Prerecommendation_AFII_June2015.config";
+  m_calibConfigData         = "JES_2015dataset_recommendation_Feb2016.config";
   m_calibConfig             = "";
 
   // CONFIG parameters for JetUncertaintiesTool
@@ -606,7 +606,8 @@ EL::StatusCode JetCalibrator :: execute ()
 
         if( m_saveAllCleanDecisions ){
           for(unsigned int i=0; i < m_allJetCleaningTools.size() ; ++i){
-            jet_itr->auxdata< char >(("clean_pass"+m_decisionNames.at(i)).c_str()) = m_allJetCleaningTools.at(i)->accept(*jetToClean);
+	    bool p = m_allJetCleaningTools.at(i)->accept(*jetToClean);
+            jet_itr->auxdata< char >(("clean_pass"+m_decisionNames.at(i)).c_str()) = p;
           }
         }
       } //end cleaning decision

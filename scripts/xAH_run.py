@@ -38,6 +38,20 @@ def getInfoFromAMI(ds):
   xsec=float(d['crossSection'])
   dsid=str(d['datasetNumber'])
   return (dsid,xsec*filtEff)
+pointdictTT={
+1150:0.00001174
+}
+pointdictGG = {
+800:0.0014891,
+900:0.000677478,
+1000:0.000325388,
+1100:0.000163491,
+1200:0.0000856418,
+1300:0.0000460525,
+1400:0.0000252977,
+1500:0.0000141903,
+1600:0.00000810078
+}
 
 # think about using argcomplete
 # https://argcomplete.readthedocs.org/en/latest/#activating-global-completion%20argcomplete
@@ -98,6 +112,7 @@ parser.add_argument('--version', action='version', version='xAH_run.py {version}
 parser.add_argument('--mode', dest='access_mode', type=str, metavar='{class, branch}', choices=['class', 'branch'], default='class', help='run using class access mode or branch access mode')
 parser.add_argument( '--treeName', dest="treeName",     default="CollectionTree", help="Tree Name to run on")
 parser.add_argument( '--isMC',     action="store_true", dest="is_MC",    default=False, help="Running MC")
+parser.add_argument( '--isSignal', action="store_true", dest="is_signal", default=False,help="Running privately produced signal")
 parser.add_argument( '--isAFII',   action="store_true", dest="is_AFII",  default=False, help="Running on AFII")
 
 
@@ -343,7 +358,7 @@ if __name__ == "__main__":
           mother_dir = os.path.dirname(sample_dir)
           sh_list = ROOT.SH.DiskListLocal(mother_dir)
           ROOT.SH.scanDir(sh_all, sh_list, fname_base, os.path.basename(sample_dir))
-
+          sampleNameList.append(fname_base)
     # print out the samples we found
     xAH_logger.info("\t%d different dataset(s) found", len(sh_all))
     if not args.use_scanDQ2:
@@ -366,8 +381,9 @@ if __name__ == "__main__":
       und = '_'
       pList = [sampleName[:-1] for sampleName in sampleNameList]
       sampleNameList=['mc15_13TeV.'+dot.join(sampleName.split(dot)[2:]) for sampleName in sampleNameList]
+
       sampleNameList=[und.join(sampleName.split(und)[:-3])+'/' for sampleName in sampleNameList]
-    if args.is_MC:
+    if args.is_MC and not args.is_signal and args.driver != "direct":
       if not args.isPrivate:
         pList =['mc15_13TeV.'+sampleName.split('.')[1]+'.*' for sampleName in sampleNameList]
       for i in range(len(pList)):
@@ -376,9 +392,25 @@ if __name__ == "__main__":
         sh_all.setMetaDouble(pList[i],'weight_xs',weight_xs)
         print('datasetNumber = ',dsid,'weight_xs = ',weight_xs)
       print('Found sample: ',)
-      sh_all.findByName(pList[0]).printContent()
+#      sh_all.findByName(pList[0]).printContent()
       if args.no_vtx:
         sh_all.setMetaDouble('no_vtx',1)
+    if args.is_signal:
+      for sampleName in sampleNameList:
+        dsid = sampleName.split('.')[2]
+        heavyMass = 0
+        weight_xs = 1.0
+        if int(dsid) < 883000:
+          heavyMass = int(str(dsid)[3])*100+800
+          weight_xs = pointdictGG[heavyMass]
+        else:
+          heavyMass = (int(dsid)-883000)*50 + 950
+          weight_xs = pointdictTT[heavyMass]
+        print('datasetNumber =',dsid,'mHeavy =',heavyMass,'weight_xs =',weight_xs)
+        sh_all.setMetaString('dsid',str(dsid))
+        sh_all.setMetaDouble('weight_xs',weight_xs)
+        if args.no_vtx:
+          sh_all.setMetaDouble('no_vtx',1)
     sh_all.printContent()
 
     # read susy meta data (should be configurable)

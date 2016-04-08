@@ -99,7 +99,7 @@ public:
   void FillJet( const xAOD::Jet* jet_itr, const xAOD::Vertex* pv, int pvLocation, const std::string jetName = "jet" );
 
   void FillTruth( const std::string truthName, const xAOD::TruthParticleContainer* truth);
-  void FillFatJets( const xAOD::JetContainer* fatJets );
+  void FillFatJets( const xAOD::JetContainer* fatJets , const xAOD::JetContainer* untrimmedFatJets);
   void FillTaus( const xAOD::TauJetContainer* taus );
   void FillMET( const xAOD::MissingETContainer* met );
 
@@ -568,6 +568,13 @@ protected:
   std::vector<float> m_fatjet_Sphericity;
   std::vector<float> m_fatjet_Aplanarity;
   std::vector<float> m_fatjet_KtDR;
+
+  std::vector<float> m_fatjet_truth_pt;
+  std::vector<float> m_fatjet_truth_eta;
+  std::vector<float> m_fatjet_truth_phi;
+  std::vector<float> m_fatjet_truth_m;
+  std::vector<float> m_fatjet_truth_E;
+  std::vector<float> m_fatjet_truth_trimmed_pt;
   // muons
   int m_nmuon;
 

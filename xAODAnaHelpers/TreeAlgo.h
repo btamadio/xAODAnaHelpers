@@ -33,6 +33,7 @@ public:
   std::string m_muContainerName;
   std::string m_elContainerName;
   std::string m_jetContainerName;
+  std::string m_untrimmedFatJetContainerName;
   std::string m_fatJetContainerName;
   std::string m_tauContainerName;
   std::string m_METContainerName;

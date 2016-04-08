@@ -46,6 +46,7 @@ TreeAlgo :: TreeAlgo (std::string className) :
   m_elContainerName         = "";
   m_jetContainerName        = "";
   m_fatJetContainerName     = "";
+  m_untrimmedFatJetContainerName = "";
   m_tauContainerName        = "";
   m_METContainerName        = "";
   m_photonContainerName     = "";
@@ -150,6 +151,7 @@ EL::StatusCode TreeAlgo :: configure ()
     m_elContainerName         = config->GetValue("ElectronContainerName",   m_elContainerName.c_str());
     m_jetContainerName        = config->GetValue("JetContainerName",        m_jetContainerName.c_str());
     m_fatJetContainerName     = config->GetValue("FatJetContainerName",     m_fatJetContainerName.c_str());
+    m_untrimmedFatJetContainerName = config->GetValue("UntrimmedFatJetContainerName",m_untrimmedFatJetContainerName.c_str());
     m_tauContainerName        = config->GetValue("TauContainerName",        m_tauContainerName.c_str());
     m_METContainerName        = config->GetValue("METContainerName",        m_METContainerName.c_str());
     m_photonContainerName     = config->GetValue("PhotonContainerName",     m_photonContainerName.c_str());
@@ -221,8 +223,10 @@ EL::StatusCode TreeAlgo :: execute ()
   }
   if ( !m_fatJetContainerName.empty() ) {
     const xAOD::JetContainer* inFatJets(nullptr);
+    const xAOD::JetContainer* untrimmedFatJets(nullptr);
     RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inFatJets, m_fatJetContainerName, m_event, m_store, m_verbose) ,"");
-    m_helpTree->FillFatJets( inFatJets );
+    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(untrimmedFatJets, m_untrimmedFatJetContainerName, m_event, m_store, m_verbose) ,"");
+    m_helpTree->FillFatJets( inFatJets, untrimmedFatJets);
   }
   if ( !m_tauContainerName.empty() ) {
     const xAOD::TauJetContainer* inTaus(nullptr);
