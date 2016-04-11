@@ -121,58 +121,8 @@ EL::StatusCode TreeAlgo :: treeInitialize ()
   return EL::StatusCode::SUCCESS;
 }
 
-<<<<<<< HEAD
-EL::StatusCode TreeAlgo :: configure ()
-{
-  if (!getConfig().empty()) {
-
-    // the file exists, use TEnv to read it off
-    TEnv* config = new TEnv(getConfig(true).c_str());
-    m_evtDetailStr            = config->GetValue("EventDetailStr",       m_evtDetailStr.c_str());
-    m_trigDetailStr           = config->GetValue("TrigDetailStr",        m_trigDetailStr.c_str());
-    m_jetTrigDetailStr        = config->GetValue("JetTrigDetailStr",     m_jetTrigDetailStr.c_str());
-    m_muDetailStr             = config->GetValue("MuonDetailStr",        m_muDetailStr.c_str());
-    m_elDetailStr             = config->GetValue("ElectronDetailStr",    m_elDetailStr.c_str());
-    m_jetDetailStr            = config->GetValue("JetDetailStr",         m_jetDetailStr.c_str());
-    m_fatJetDetailStr         = config->GetValue("FatJetDetailStr",      m_fatJetDetailStr.c_str());
-    m_tauDetailStr            = config->GetValue("TauDetailStr",         m_tauDetailStr.c_str());
-    m_METDetailStr            = config->GetValue("METDetailStr",         m_METDetailStr.c_str());
-    m_photonDetailStr         = config->GetValue("PhotonDetailStr",      m_photonDetailStr.c_str());
-
-    m_debug                   = config->GetValue("Debug" ,           m_debug);
-
-    m_outHistDir              = config->GetValue("SameHistsOutDir",  m_outHistDir);
-
-    m_muContainerName         = config->GetValue("MuonContainerName",       m_muContainerName.c_str());
-    m_elContainerName         = config->GetValue("ElectronContainerName",   m_elContainerName.c_str());
-    m_jetContainerName        = config->GetValue("JetContainerName",        m_jetContainerName.c_str());
-    m_fatJetContainerName     = config->GetValue("FatJetContainerName",     m_fatJetContainerName.c_str());
-    m_untrimmedFatJetContainerName = config->GetValue("UntrimmedFatJetContainerName",m_untrimmedFatJetContainerName.c_str());
-    m_tauContainerName        = config->GetValue("TauContainerName",        m_tauContainerName.c_str());
-    m_METContainerName        = config->GetValue("METContainerName",        m_METContainerName.c_str());
-    m_photonContainerName     = config->GetValue("PhotonContainerName",     m_photonContainerName.c_str());
-
-    // DC14 switch for little things that need to happen to run
-    // for those samples with the corresponding packages
-    m_DC14                    = config->GetValue("DC14", m_DC14);
-
-    Info("configure()", "Loaded in configuration values");
-
-    // everything seems preliminarily ok, let's print config and say we were successful
-    config->Print();
-
-    delete config; config = nullptr;
-  }
-
-  return EL::StatusCode::SUCCESS;
-}
-
-=======
->>>>>>> 5214b948fbc47c9459636deca8014f55c443e079
 EL::StatusCode TreeAlgo :: fileExecute () { return EL::StatusCode::SUCCESS; }
 EL::StatusCode TreeAlgo :: changeInput (bool /*firstFile*/) { return EL::StatusCode::SUCCESS; }
-
-
 EL::StatusCode TreeAlgo :: execute ()
 {
 
