@@ -1,3 +1,10 @@
+/**
+ * @file   MuonEfficiencyCorrector.h
+ * @author Marco Milesi <marco.milesi@cern.ch>
+ * @brief  Interface to the tools of the MuonEfficiencyCorrections package.
+ *
+ */
+
 #ifndef xAODAnaHelpers_MuonEfficiencyCorrector_H
 #define xAODAnaHelpers_MuonEfficiencyCorrector_H
 
@@ -13,6 +20,7 @@
 #include "MuonEfficiencyCorrections/MuonTriggerScaleFactors.h"
 #include "MuonSelectorTools/MuonSelectionTool.h"
 #include "PileupReweighting/PileupReweightingTool.h"
+#include "AsgTools/AnaToolHandle.h"
 
 // algorithm wrapper
 #include "xAODAnaHelpers/Algorithm.h"
@@ -27,6 +35,8 @@ public:
   // configuration variables
   std::string   m_inContainerName;
 
+  std::string   m_calibRelease;
+
   // Reco efficiency SF
   std::string   m_WorkingPointReco;
 
@@ -35,10 +45,14 @@ public:
 
   // Trigger efficiency SF
   int           m_runNumber;
+  bool          m_useRandomRunNumber;
   std::string   m_WorkingPointRecoTrig;
   std::string   m_WorkingPointIsoTrig;
   std::string   m_SingleMuTrig;      // this can be either a single muon trigger chain, or an OR of ( 2 single muon chains )
   std::string   m_DiMuTrig;          // this can be either a dimuon trigger chain, or an OR of ( N single muon trigger chains, dimuon chain )
+
+  // TTVA efficiency SF
+  std::string   m_WorkingPointTTVA;
 
   // systematics
   std::string   m_inputAlgoSystNames;  // this is the name of the vector of names of the systematically varied containers produced by the
@@ -47,19 +61,23 @@ public:
   float         m_systValReco;
   float         m_systValIso;
   float         m_systValTrig;
+  float         m_systValTTVA;
   std::string   m_systNameReco;
   std::string   m_systNameIso;
   std::string   m_systNameTrig;
+  std::string   m_systNameTTVA;
   std::string   m_outputSystNamesReco;
   std::string   m_outputSystNamesIso;
   std::string   m_outputSystNamesTrig;
+  std::string   m_outputSystNamesTrigMCEff;
+  std::string   m_outputSystNamesTTVA;
 
 private:
 
   xAOD::TEvent *m_event;  //!
   xAOD::TStore *m_store;  //!
 
-  bool m_isMC;        //!
+  bool m_isMC;            //!
 
   int m_numEvent;         //!
   int m_numObject;        //!
@@ -67,12 +85,18 @@ private:
   std::vector<CP::SystematicSet> m_systListReco; //!
   std::vector<CP::SystematicSet> m_systListIso;  //!
   std::vector<CP::SystematicSet> m_systListTrig; //!
+  std::vector<CP::SystematicSet> m_systListTTVA; //!
 
   // tools
-  CP::MuonEfficiencyScaleFactors  *m_asgMuonEffCorrTool_muSF_Reco;     //!
-  CP::MuonEfficiencyScaleFactors  *m_asgMuonEffCorrTool_muSF_Iso;      //!
-  CP::MuonTriggerScaleFactors     *m_asgMuonEffCorrTool_muSF_Trig ;    //!
-  CP::PileupReweightingTool       *m_pileuptool;                       //!
+  asg::AnaToolHandle<CP::IMuonEfficiencyScaleFactors> m_muRecoSF_tool_handle; //!
+  std::string m_recoEffSF_tool_name;                                          //!
+  asg::AnaToolHandle<CP::IMuonEfficiencyScaleFactors> m_muIsoSF_tool_handle;  //!
+  std::string m_isoEffSF_tool_name;                                           //!
+  asg::AnaToolHandle<CP::IMuonTriggerScaleFactors> m_muTrigSF_tool_handle;    //!
+  std::string m_trigEffSF_tool_name;                                          //!
+  asg::AnaToolHandle<CP::IMuonEfficiencyScaleFactors> m_muTTVASF_tool_handle; //!
+  std::string m_TTVAEffSF_tool_name;                                          //!
+  asg::AnaToolHandle<CP::IPileupReweightingTool> m_pileup_tool_handle;        //!
 
   // variables that don't get filled at submission time should be
   // protected from being send from the submission node to the worker
@@ -82,7 +106,6 @@ public:
 
   // Tree *myTree; //!
   // TH1 *myHist;  //!
-
 
   // this is a standard constructor
   MuonEfficiencyCorrector (std::string className = "MuonEfficiencyCorrector");
@@ -99,9 +122,7 @@ public:
   virtual EL::StatusCode histFinalize ();
 
   // these are the functions not inherited from Algorithm
-  virtual EL::StatusCode configure ();
-
-  virtual EL::StatusCode executeSF (  const xAOD::MuonContainer* inputMuons, const xAOD::EventInfo* eventInfo, unsigned int countSyst  );
+  virtual EL::StatusCode executeSF ( const xAOD::EventInfo* eventInfo, const xAOD::MuonContainer* inputMuons, unsigned int countSyst  );
 
   /// @cond
   // this is needed to distribute the algorithm to the workers

@@ -8,9 +8,7 @@
 #include <xAODAnaHelpers/tools/ReturnCheck.h>
 
 // ROOT include(s):
-#include "TEnv.h"
 #include "TFile.h"
-#include "TSystem.h"
 #include "TObjArray.h"
 #include "TObjString.h"
 
@@ -18,6 +16,8 @@
 #include <iostream>
 #include <typeinfo>
 #include <sstream>
+
+using std::vector;
 
 // this is needed to distribute the algorithm to the workers
 ClassImp(TrackSelector)
@@ -28,13 +28,7 @@ TrackSelector :: TrackSelector (std::string className) :
     m_cutflowHist(nullptr),
     m_cutflowHistW(nullptr)
 {
-  // Here you put any code for the base initialization of variables,
-  // e.g. initialize all pointers to 0.  Note that you should only put
-  // the most basic initialization here, since this method will be
-  // called on both the submission and the worker node.  Most of your
-  // initialization code will go into histInitialize() and
-  // initialize().
-  Info("TrackSelector()", "Calling constructor");
+  if(m_debug) Info("TrackSelector()", "Calling constructor");
 
   // read debug flag from .config file
   m_debug         = false;
@@ -42,6 +36,7 @@ TrackSelector :: TrackSelector (std::string className) :
 
   // input container to be read from TEvent or TStore
   m_inContainerName  = "";
+  m_inJetContainerName  = "";
 
   // decorate selected objects that pass the cuts
   m_decorateSelectedObjects = true;
@@ -74,80 +69,8 @@ TrackSelector :: TrackSelector (std::string className) :
 
   m_failAuxDecorKeys        = "";
 
-}
+  m_doTracksInJets          = false;
 
-EL::StatusCode  TrackSelector :: configure ()
-{
-  if(!getConfig().empty()){
-    Info("configure()", "Configuing TrackSelector Interface. User configuration read from : %s ", getConfig().c_str());
-
-    TEnv* config = new TEnv(getConfig(true).c_str());
-
-    // read debug flag from .config file
-    m_debug         = config->GetValue("Debug" ,      m_debug);
-    m_useCutFlow    = config->GetValue("UseCutFlow",  m_useCutFlow);
-
-    // input container to be read from TEvent or TStore
-    m_inContainerName  = config->GetValue("InputContainer",  m_inContainerName.c_str());
-
-    // decorate selected objects that pass the cuts
-    m_decorateSelectedObjects = config->GetValue("DecorateSelectedObjects", m_decorateSelectedObjects);
-    // additional functionality : create output container of selected objects
-    //                            using the SG::VIEW_ELEMENTS option
-    //                            decorating and output container should not be mutually exclusive
-    m_createSelectedContainer = config->GetValue("CreateSelectedContainer", m_createSelectedContainer);
-    // if requested, a new container is made using the SG::VIEW_ELEMENTS option
-    m_outContainerName        = config->GetValue("OutputContainer", m_outContainerName.c_str());
-    // if only want to look at a subset of object
-    m_nToProcess              = config->GetValue("NToProcess", m_nToProcess);
-
-    // cuts
-    m_pass_max                = config->GetValue("PassMax",      m_pass_max);
-    m_pass_min                = config->GetValue("PassMin",      m_pass_min);
-    m_pT_max                  = config->GetValue("pTMax",        m_pT_max);
-    m_pT_min                  = config->GetValue("pTMin",        m_pT_min);
-    m_eta_max                 = config->GetValue("etaMax",       m_eta_max);
-    m_eta_min                 = config->GetValue("etaMin",       m_eta_min);
-    m_d0_max                  = config->GetValue("d0Max",        m_d0_max);
-    m_z0_max                  = config->GetValue("z0Max",        m_z0_max);
-    m_z0sinT_max              = config->GetValue("z0SinTMax",    m_z0sinT_max);
-    m_nBL_min                 = config->GetValue("nBLMin",       m_nBL_min);
-    m_nSi_min                 = config->GetValue("nSiMin",       m_nSi_min);
-    m_nPixHoles_max           = config->GetValue("nPixHolesMax", m_nPixHoles_max);
-    m_chi2NdofCut_max         = config->GetValue("chi2NdofMax",  m_chi2NdofCut_max);
-    m_chi2Prob_max            = config->GetValue("chi2ProbMax",  m_chi2Prob_max);
-
-    m_passAuxDecorKeys        = config->GetValue("PassDecorKeys", m_passAuxDecorKeys.c_str());
-
-    m_failAuxDecorKeys        = config->GetValue("FailDecorKeys", m_failAuxDecorKeys.c_str());
-
-    config->Print();
-    Info("configure()", "TrackSelector Interface succesfully configured! ");
-
-    delete config;
-  }
-
-  // parse and split by comma
-  std::string token;
-  std::istringstream ss(m_passAuxDecorKeys);
-  while(std::getline(ss, token, ',')){
-    m_passKeys.push_back(token);
-  }
-  ss.clear();
-  ss.str(m_failAuxDecorKeys);
-  while(std::getline(ss, token, ',')){
-    m_failKeys.push_back(token);
-  }
-
-
-  if( m_inContainerName.empty() ) {
-    Error("configure()", "InputContainer is empty!");
-    return EL::StatusCode::FAILURE;
-  }
-
-
-
-  return EL::StatusCode::SUCCESS;
 }
 
 EL::StatusCode TrackSelector :: setupJob (EL::Job& job)
@@ -160,7 +83,7 @@ EL::StatusCode TrackSelector :: setupJob (EL::Job& job)
   // activated/deactivated when you add/remove the algorithm from your
   // job, which may or may not be of value to you.
 
-  Info("setupJob()", "Calling setupJob");
+  if(m_debug) Info("setupJob()", "Calling setupJob");
 
   job.useXAOD ();
   xAOD::Init( "TrackSelector" ).ignore(); // call before opening first file
@@ -177,7 +100,7 @@ EL::StatusCode TrackSelector :: histInitialize ()
   // trees.  This method gets called before any input files are
   // connected.
 
-  Info("histInitialize()", "Calling histInitialize");
+  if(m_debug) Info("histInitialize()", "Calling histInitialize");
   RETURN_CHECK("xAH::Algorithm::algInitialize()", xAH::Algorithm::algInitialize(), "");
   return EL::StatusCode::SUCCESS;
 }
@@ -189,7 +112,7 @@ EL::StatusCode TrackSelector :: fileExecute ()
   // Here you do everything that needs to be done exactly once for every
   // single file, e.g. collect a list of all lumi-blocks processed
 
-  Info("fileExecute()", "Calling fileExecute");
+  if(m_debug) Info("fileExecute()", "Calling fileExecute");
 
   return EL::StatusCode::SUCCESS;
 }
@@ -202,7 +125,7 @@ EL::StatusCode TrackSelector :: changeInput (bool /*firstFile*/)
   // e.g. resetting branch addresses on trees.  If you are using
   // D3PDReader or a similar service this method is not needed.
 
-  Info("changeInput()", "Calling changeInput");
+  if(m_debug) Info("changeInput()", "Calling changeInput");
 
   return EL::StatusCode::SUCCESS;
 }
@@ -228,22 +151,35 @@ EL::StatusCode TrackSelector :: initialize ()
     m_cutflowHistW->GetXaxis()->FindBin(m_name.c_str());
   }
 
-  if ( this->configure() == EL::StatusCode::FAILURE ) {
-    Error("initialize()", "Failed to properly configure. Exiting." );
+  // parse and split by comma
+  std::string token;
+  std::istringstream ss(m_passAuxDecorKeys);
+  while(std::getline(ss, token, ',')){
+    m_passKeys.push_back(token);
+  }
+  ss.clear();
+  ss.str(m_failAuxDecorKeys);
+  while(std::getline(ss, token, ',')){
+    m_failKeys.push_back(token);
+  }
+
+
+  if( m_inContainerName.empty() ) {
+    Error("initialize()", "InputContainer is empty!");
     return EL::StatusCode::FAILURE;
   }
 
   m_event = wk()->xaodEvent();
   m_store = wk()->xaodStore();
 
-  Info("initialize()", "Number of events in file: %lld ", m_event->getEntries() );
+  if(m_debug) Info("initialize()", "Number of events in file: %lld ", m_event->getEntries() );
 
   m_numEvent      = 0;
   m_numObject     = 0;
   m_numEventPass  = 0;
   m_numObjectPass = 0;
 
-  Info("initialize()", "TrackSelector Interface succesfully initialized!" );
+  if(m_debug) Info("initialize()", "TrackSelector Interface succesfully initialized!" );
 
   return EL::StatusCode::SUCCESS;
 }
@@ -252,13 +188,20 @@ EL::StatusCode TrackSelector :: initialize ()
 
 EL::StatusCode TrackSelector :: execute ()
 {
-  // Here you do everything that needs to be done on every single
-  // events, e.g. read input variables, apply cuts, and fill
-  // histograms and trees.  This is where most of your actual analysis
-  // code will go.
 
   if(m_debug) Info("execute()", "Applying Track Selection... ");
 
+  if(m_doTracksInJets){
+    return executeTracksInJets();
+  } else{
+    return executeTrackCollection();
+  }
+
+  return EL::StatusCode::SUCCESS;
+}
+
+EL::StatusCode TrackSelector :: executeTrackCollection ()
+{
   float mcEvtWeight(1); // FIXME - set to something from eventInfo
 
   m_numEvent++;
@@ -337,6 +280,74 @@ EL::StatusCode TrackSelector :: execute ()
 }
 
 
+EL::StatusCode TrackSelector :: executeTracksInJets ()
+{
+  m_numEvent++;
+
+  // get input jet collection
+  const xAOD::JetContainer* inJets(nullptr);
+  RETURN_CHECK("JetSelector::execute()", HelperFunctions::retrieve(inJets, m_inJetContainerName, m_event, m_store, m_verbose) ,"");
+
+  //// get primary vertex
+  //const xAOD::VertexContainer *vertices(nullptr);
+  //RETURN_CHECK("TrackSelector::execute()", HelperFunctions::retrieve(vertices, "PrimaryVertices", m_event, m_store, m_verbose) ,"");
+  //const xAOD::Vertex *pvx = HelperFunctions::getPrimaryVertex(vertices);
+
+  int nPass(0); int nObj(0);
+
+  //
+  //  Accessor for adding the output jets
+  //
+  xAOD::Jet::Decorator<vector<const xAOD::TrackParticle*> > m_track_decoration(m_outContainerName.c_str());
+  xAOD::Jet::Decorator<const xAOD::Vertex*>                 m_vtx_decoration  ((m_outContainerName+"_vtx").c_str());
+
+  //
+  // loop on Jets
+  //
+  for ( auto jet_itr : *inJets ) {
+
+    //
+    //  output container with in the jet
+    //
+    vector<const xAOD::TrackParticle*> outputTracks;
+
+    //
+    // loop on tracks with in jet
+    //
+    const vector<const xAOD::TrackParticle*> inputTracks = jet_itr->auxdata< vector<const xAOD::TrackParticle*>  >(m_inContainerName);
+    const xAOD::Vertex* pvx                              = jet_itr->auxdata< const xAOD::Vertex*                 >(m_inContainerName+"_vtx");
+    for(const xAOD::TrackParticle* trkInJet: inputTracks){
+
+      nObj++;
+
+      //
+      // Get cut desicion
+      //
+      int passSel = this->PassCuts( trkInJet, pvx );
+
+      //
+      // if
+      //
+      if(passSel) {
+	nPass++;
+	outputTracks.push_back(trkInJet);
+      }
+    }// tracks
+
+    m_numObject     += nObj;
+    m_numObjectPass += nPass;
+
+    m_track_decoration(*jet_itr)  = outputTracks;
+    m_vtx_decoration(*jet_itr)    = jet_itr->auxdata<const xAOD::Vertex*>(m_inContainerName+"_vtx");
+
+  }//jets
+
+  m_numEventPass++;
+  return EL::StatusCode::SUCCESS;
+}
+
+
+
 EL::StatusCode TrackSelector :: postExecute ()
 {
   // Here you do everything that needs to be done after the main event
@@ -362,7 +373,7 @@ EL::StatusCode TrackSelector :: finalize ()
   // merged.  This is different from histFinalize() in that it only
   // gets called on worker nodes that processed input events.
 
-  Info("finalize()", "Deleting tool instances...");
+  if(m_debug) Info("finalize()", "Deleting tool instances...");
 
   return EL::StatusCode::SUCCESS;
 }
@@ -414,7 +425,7 @@ int TrackSelector :: PassCuts( const xAOD::TrackParticle* trk, const xAOD::Verte
   //
   //  Z0
   //
-  float z0 = (trk->z0() + trk->vz() - pvx->z());
+  float z0 = (trk->z0() + trk->vz() - HelperFunctions::getPrimaryVertexZ(pvx));
   if( m_z0_max != 1e8 ){
     if( fabs(z0) > m_z0_max ) {return 0; }
   }

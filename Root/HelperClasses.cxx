@@ -84,12 +84,11 @@ namespace HelperClasses{
 
   void EventInfoSwitch::initialize(){
     m_pileup        = has_exact("pileup");
+    m_eventCleaning = has_exact("eventCleaning");
     m_shapeEM       = has_exact("shapeEM");
     m_shapeLC       = has_exact("shapeLC");
     m_truth         = has_exact("truth");
     m_caloClus      = has_exact("caloClusters");
-    m_muonSF        = has_exact("muonSF");
-    m_electronSF    = has_exact("electronSF");
   }
 
   void TriggerInfoSwitch::initialize(){
@@ -103,8 +102,21 @@ namespace HelperClasses{
     m_clean         = has_exact("clean");
   }
 
-  void MuonInfoSwitch::initialize(){
+  void IParticleInfoSwitch::initialize(){
     m_kinematic     = has_exact("kinematic");
+
+    m_numLeading    = 0;
+    for(auto configDetail : m_configDetails)
+      {
+	if( configDetail.compare(0,8,"NLeading")==0) 
+	  {
+	    m_numLeading = std::atoi( configDetail.substr(8, std::string::npos).c_str() );
+	    break;
+	  }
+      }
+  }
+
+  void MuonInfoSwitch::initialize(){
     m_trigger       = has_exact("trigger");
     m_isolation     = has_exact("isolation");
     m_quality       = has_exact("quality");
@@ -115,7 +127,6 @@ namespace HelperClasses{
   }
 
   void ElectronInfoSwitch::initialize(){
-    m_kinematic     = has_exact("kinematic");
     m_trigger       = has_exact("trigger");
     m_isolation     = has_exact("isolation");
     m_PID           = has_exact("PID");
@@ -125,13 +136,11 @@ namespace HelperClasses{
   }
 
   void PhotonInfoSwitch::initialize(){
-    m_kinematic     = has_exact("kinematic");
     m_isolation     = has_exact("isolation");
     m_PID           = has_exact("PID");
   }
 
   void JetInfoSwitch::initialize(){
-    m_kinematic     = has_exact("kinematic");
     m_substructure  = has_exact("substructure");
     m_rapidity      = has_exact("rapidity");
     m_clean         = has_exact("clean");
@@ -153,9 +162,32 @@ namespace HelperClasses{
     m_constituentAll    = has_exact("constituentAll");
     m_flavTag           = has_exact("flavorTag");
     m_flavTagHLT        = has_exact("flavorTagHLT");
+    m_btag_jettrk       = has_exact("btag_jettrk");
     m_jetFitterDetails  = has_exact("jetFitterDetails");
     m_svDetails         = has_exact("svDetails");
     m_ipDetails         = has_exact("ipDetails");
+
+    if(has_match("tracksInJet")){
+      m_tracksInJet       = true;
+      std::string input(m_configStr);
+      // erase everything before the interesting string
+      input.erase( 0, input.find("tracksInJet_") );
+      // erase everything after the interesting string
+      // only if there is something after the string
+      if( input.find(" ") != std::string::npos ) {
+        input.erase( input.find_first_of(" "), input.size() );
+      }
+      // remove tracksInJet_ to just leave the tack name
+      input.erase(0,12);
+
+      m_trackName = input;
+    }else{
+      m_tracksInJet       = false;
+      m_trackName         = "";
+    }
+
+    m_charge            = has_exact("charge");
+
     m_sfFTagFix.clear();
     if( has_match( "sfFTagFix" ) ) {
       std::string input(m_configStr);
@@ -203,14 +235,6 @@ namespace HelperClasses{
       }
     } // sfFTagFlt
     m_area          = has_exact("area");
-    if( has_match("LeadingJets") ){
-      m_numLeadingJets = std::atoi( (m_configStr.substr( m_configStr.find("LeadingJets")-2 , 2)).c_str() );
-      if (m_numLeadingJets == 0){ //Perhaps infoSwitches are combined and Njets < 10
-        m_numLeadingJets = std::atoi( (m_configStr.substr( m_configStr.find("LeadingJets")-1 , 1)).c_str() );
-      }
-    }else{
-      m_numLeadingJets = 0;
-    }
   }
 
   void TruthInfoSwitch::initialize(){
@@ -219,7 +243,6 @@ namespace HelperClasses{
 
 
   void TauInfoSwitch::initialize(){
-    m_kinematic     = has_exact("kinematic");
     m_trackparams   = has_exact("trackparams");
     m_trackhitcont  = has_exact("trackhitcont");
   }

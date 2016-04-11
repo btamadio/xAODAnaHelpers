@@ -1,13 +1,3 @@
-/************************************
- *
- * Jet selector tool
- *
- * G.Facini (gabriel.facini@cern.ch)
- * M. Milesi (marco.milesi@cern.ch)
- * J.Alison (john.alison@cern.ch)
- *
- ************************************/
-
 // c++ include(s):
 #include <iostream>
 #include <typeinfo>
@@ -36,9 +26,7 @@
 // external tools include(s):
 
 // ROOT include(s):
-#include "TEnv.h"
 #include "TFile.h"
-#include "TSystem.h"
 #include "TObjArray.h"
 #include "TObjString.h"
 
@@ -51,7 +39,8 @@ JetSelector :: JetSelector (std::string className) :
     m_cutflowHist(nullptr),
     m_cutflowHistW(nullptr),
     m_jet_cutflowHist_1(nullptr),
-    m_BJetSelectTool(nullptr)
+    m_BJetSelectTool(nullptr),
+    m_JVT_tool_handle("CP::JetJvtEfficiency/JVTToolName", nullptr)
 {
   // Here you put any code for the base initialization of variables,
   // e.g. initialize all pointers to 0.  Note that you should only put
@@ -60,7 +49,7 @@ JetSelector :: JetSelector (std::string className) :
   // initialization code will go into histInitialize() and
   // initialize().
 
-  Info("JetSelector()", "Calling constructor");
+  if(m_debug) Info("JetSelector()", "Calling constructor");
 
   // read debug flag from .config file
   m_debug         = false;
@@ -76,7 +65,7 @@ JetSelector :: JetSelector (std::string className) :
 
   // decorate selected objects that pass the cuts
   m_decorateSelectedObjects = true;
-  m_decor   = "passSel";
+  m_decor                   = "passSel";
 
   // additional functionality : create output container of selected objects
   //                            using the SG::VIEW_ELEMENTS option
@@ -103,6 +92,7 @@ JetSelector :: JetSelector (std::string className) :
   m_rapidity_max            = 1e8;
   m_rapidity_min            = 1e8;
   m_truthLabel 	            = -1;
+  m_useHadronConeExcl       = true;
 
   m_doJVF 		    = false;
   m_pt_max_JVF 	            = 50e3;
@@ -111,7 +101,12 @@ JetSelector :: JetSelector (std::string className) :
   m_doJVT 		    = false;
   m_pt_max_JVT 	            = 50e3;
   m_eta_max_JVT 	    = 2.4;
-  m_JVTCut 		    = 0.64;
+  m_JVTCut 		    = -1.0;
+  m_WorkingPointJVT         = "Medium";
+
+  m_systValJVT 	            = 0.0;
+  m_systNameJVT	            = "";
+  m_outputSystNamesJVT      = "JetJvtEfficiency_JVTSyst";
 
   // Btag quality
   m_doBTagCut 		    = false;
@@ -134,78 +129,111 @@ JetSelector :: JetSelector (std::string className) :
 
 }
 
-EL::StatusCode  JetSelector :: configure ()
+EL::StatusCode JetSelector :: setupJob (EL::Job& job)
 {
-  if ( !getConfig().empty() ) {
-    Info("configure()", "Configuing JetSelector Interface. User configuration read from : %s ", getConfig().c_str());
+  // Here you put code that sets up the job on the submission object
+  // so that it is ready to work with your algorithm, e.g. you can
+  // request the D3PDReader service or add output files.  Any code you
+  // put here could instead also go into the submission script.  The
+  // sole advantage of putting it here is that it gets automatically
+  // activated/deactivated when you add/remove the algorithm from your
+  // job, which may or may not be of value to you.
 
-    TEnv* config = new TEnv(getConfig(true).c_str());
+  if(m_debug) Info("setupJob()", "Calling setupJob");
 
-    // read debug flag from .config file
-    m_debug         = config->GetValue("Debug" ,      m_debug);
-    m_useCutFlow    = config->GetValue("UseCutFlow",  m_useCutFlow);
+  job.useXAOD ();
+  xAOD::Init( "JetSelector" ).ignore(); // call before opening first file
 
-    // input container to be read from TEvent or TStore
-    m_inContainerName         = config->GetValue("InputContainer",  m_inContainerName.c_str());
-    m_jetScaleType            = config->GetValue("JetScaleType",  m_jetScaleType.c_str());
+  return EL::StatusCode::SUCCESS;
+}
 
-    // name of algo input container comes from - only if running on syst
-    m_inputAlgo               = config->GetValue("InputAlgo",   m_inputAlgo.c_str());
-    m_outputAlgo              = config->GetValue("OutputAlgo",  m_outputAlgo.c_str());
 
-    // decorate selected objects that pass the cuts
-    m_decorateSelectedObjects = config->GetValue("DecorateSelectedObjects", m_decorateSelectedObjects);
-    // additional functionality : create output container of selected objects
-    //                            using the SG::VIEW_ELEMENTS option
-    //                            decorating and output container should not be mutually exclusive
-    m_createSelectedContainer = config->GetValue("CreateSelectedContainer", m_createSelectedContainer);
-    // if requested, a new container is made using the SG::VIEW_ELEMENTS option
-    m_outContainerName        = config->GetValue("OutputContainer", m_outContainerName.c_str());
-    // if only want to look at a subset of object
-    m_nToProcess              = config->GetValue("NToProcess", m_nToProcess);
 
-    // cuts
-    m_cleanJets               = config->GetValue("CleanJets",  m_cleanJets);
-    m_cleanEvtLeadJets        = config->GetValue("CleanEventWithLeadJets", m_cleanEvtLeadJets); // indepedent of previous switch
-    m_pass_max                = config->GetValue("PassMax",      m_pass_max);
-    m_pass_min                = config->GetValue("PassMin",      m_pass_min);
-    m_pT_max                  = config->GetValue("pTMax",       m_pT_max);
-    m_pT_min                  = config->GetValue("pTMin",       m_pT_min);
-    m_eta_max                 = config->GetValue("etaMax",      m_eta_max);
-    m_eta_min                 = config->GetValue("etaMin",      m_eta_min);
-    m_detEta_max              = config->GetValue("detEtaMax",   m_detEta_max);
-    m_detEta_min              = config->GetValue("detEtaMin",   m_detEta_min);
-    m_mass_max                = config->GetValue("massMax",     m_mass_max);
-    m_mass_min                = config->GetValue("massMin",     m_mass_min);
-    m_rapidity_max            = config->GetValue("rapidityMax", m_rapidity_max);
-    m_rapidity_min            = config->GetValue("rapidityMin", m_rapidity_min);
-    m_truthLabel 	      = config->GetValue("TruthLabel",   m_truthLabel);
+EL::StatusCode JetSelector :: histInitialize ()
+{
+  // Here you do everything that needs to be done at the very
+  // beginning on each worker node, e.g. create histograms and output
+  // trees.  This method gets called before any input files are
+  // connected.
 
-    m_doJVF 		      = config->GetValue("DoJVF",       m_doJVF);
-    m_pt_max_JVF 	      = config->GetValue("pTMaxJVF",    m_pt_max_JVF);
-    m_eta_max_JVF 	      = config->GetValue("etaMaxJVF",   m_eta_max_JVF);
-    m_JVFCut 		      = config->GetValue("JVFCut",      m_JVFCut);
+  if(m_debug) Info("histInitialize()", "Calling histInitialize");
+  RETURN_CHECK("xAH::Algorithm::algInitialize()", xAH::Algorithm::algInitialize(), "");
 
-    m_doJVT 		      = config->GetValue("DoJVT",       m_doJVT);
-    m_pt_max_JVT 	      = config->GetValue("pTMaxJVT",    m_pt_max_JVT);
-    m_eta_max_JVT 	      = config->GetValue("etaMaxJVT",   m_eta_max_JVT);
-    m_JVTCut 		      = config->GetValue("JVTCut",      m_JVTCut);
+  return EL::StatusCode::SUCCESS;
+}
 
-    // Btag quality
-    m_doBTagCut		      = config->GetValue("DoBTagCut",       m_doBTagCut);
-    m_jetAuthor               = config->GetValue("JetAuthor",       m_jetAuthor.c_str() );
-    m_taggerName              = config->GetValue("TaggerName",      m_taggerName.c_str() );
-    m_operatingPt             = config->GetValue("OperatingPoint",  m_operatingPt.c_str());
-    m_b_eta_max               = config->GetValue("B_etaMax",        m_b_eta_max);
-    m_b_pt_min                = config->GetValue("B_pTMin",         m_b_pt_min);
 
-    m_passAuxDecorKeys        = config->GetValue("PassDecorKeys", m_passAuxDecorKeys.c_str());
-    m_failAuxDecorKeys        = config->GetValue("FailDecorKeys", m_failAuxDecorKeys.c_str());
 
-    config->Print();
-    Info("configure()", "JetSelector Interface succesfully configured! ");
+EL::StatusCode JetSelector :: fileExecute ()
+{
+  // Here you do everything that needs to be done exactly once for every
+  // single file, e.g. collect a list of all lumi-blocks processed
 
-    delete config; config = nullptr;
+  if(m_debug) Info("fileExecute()", "Calling fileExecute");
+
+  return EL::StatusCode::SUCCESS;
+}
+
+
+
+EL::StatusCode JetSelector :: changeInput (bool /*firstFile*/)
+{
+  // Here you do everything you need to do when we change input files,
+  // e.g. resetting branch addresses on trees.  If you are using
+  // D3PDReader or a similar service this method is not needed.
+
+  if(m_debug) Info("changeInput()", "Calling changeInput");
+
+  return EL::StatusCode::SUCCESS;
+}
+
+
+
+EL::StatusCode JetSelector :: initialize ()
+{
+  // Here you do everything that you need to do after the first input
+  // file has been connected and before the first event is processed,
+  // e.g. create additional histograms based on which variables are
+  // available in the input files.  You can also create all of your
+  // histograms and trees in here, but be aware that this method
+  // doesn't get called if no events are processed.  So any objects
+  // you create here won't be available in the output if you have no
+  // input events.
+  
+  if ( m_debug ) Info("initialize()", "Calling initialize");
+
+  m_event = wk()->xaodEvent();
+  m_store = wk()->xaodStore();
+  
+  const xAOD::EventInfo* eventInfo(nullptr);
+  RETURN_CHECK("JetSelector::initialize()", HelperFunctions::retrieve(eventInfo, m_eventInfoContainerName, m_event, m_store, m_verbose) ,"");
+  m_isMC = ( eventInfo->eventType( xAOD::EventInfo::IS_SIMULATION ) );
+
+  if ( m_useCutFlow ) {
+
+   // retrieve the file in which the cutflow hists are stored
+    //
+    TFile *file     = wk()->getOutputFile ("cutflow");
+
+    // retrieve the event cutflows
+    //
+    m_cutflowHist  = (TH1D*)file->Get("cutflow");
+    m_cutflowHistW = (TH1D*)file->Get("cutflow_weighted");
+    m_cutflow_bin  = m_cutflowHist->GetXaxis()->FindBin(m_name.c_str());
+    m_cutflowHistW->GetXaxis()->FindBin(m_name.c_str());
+
+    // retrieve the object cutflow
+    //
+    m_jet_cutflowHist_1 = (TH1D*)file->Get("cutflow_jets_1");
+
+    m_jet_cutflow_all             = m_jet_cutflowHist_1->GetXaxis()->FindBin("all");
+    m_jet_cutflow_cleaning_cut    = m_jet_cutflowHist_1->GetXaxis()->FindBin("cleaning_cut");
+    m_jet_cutflow_ptmax_cut       = m_jet_cutflowHist_1->GetXaxis()->FindBin("ptmax_cut");
+    m_jet_cutflow_ptmin_cut       = m_jet_cutflowHist_1->GetXaxis()->FindBin("ptmin_cut");
+    m_jet_cutflow_eta_cut         = m_jet_cutflowHist_1->GetXaxis()->FindBin("eta_cut");
+    m_jet_cutflow_jvt_cut         = m_jet_cutflowHist_1->GetXaxis()->FindBin("JVT_cut");
+    m_jet_cutflow_btag_cut        = m_jet_cutflowHist_1->GetXaxis()->FindBin("BTag_cut");
+
   }
 
   //If not set, find default from input container name
@@ -241,7 +269,7 @@ EL::StatusCode  JetSelector :: configure ()
   }
 
   if ( m_inContainerName.empty() ) {
-    Error("configure()", "InputContainer is empty!");
+    Error("initialize()", "InputContainer is empty!");
     return EL::StatusCode::FAILURE;
   }
 
@@ -264,119 +292,12 @@ EL::StatusCode  JetSelector :: configure ()
   if (m_operatingPt == "FlatCutBEff_85") { allOK = true; }
 
   if( !allOK ) {
-    Error("configure()", "Requested operating point is not known to xAH. Arrow v Indian? %s", m_operatingPt.c_str());
+    Error("initialize()", "Requested operating point is not known to xAH. Arrow v Indian? %s", m_operatingPt.c_str());
     return EL::StatusCode::FAILURE;
   }
 
   if ( m_decorateSelectedObjects ) {
-    Info("configure()"," Decorate Jets with %s", m_decor.c_str());
-  }
-
-  return EL::StatusCode::SUCCESS;
-}
-
-EL::StatusCode JetSelector :: setupJob (EL::Job& job)
-{
-  // Here you put code that sets up the job on the submission object
-  // so that it is ready to work with your algorithm, e.g. you can
-  // request the D3PDReader service or add output files.  Any code you
-  // put here could instead also go into the submission script.  The
-  // sole advantage of putting it here is that it gets automatically
-  // activated/deactivated when you add/remove the algorithm from your
-  // job, which may or may not be of value to you.
-
-  Info("setupJob()", "Calling setupJob");
-
-  job.useXAOD ();
-  xAOD::Init( "JetSelector" ).ignore(); // call before opening first file
-
-  return EL::StatusCode::SUCCESS;
-}
-
-
-
-EL::StatusCode JetSelector :: histInitialize ()
-{
-  // Here you do everything that needs to be done at the very
-  // beginning on each worker node, e.g. create histograms and output
-  // trees.  This method gets called before any input files are
-  // connected.
-
-  Info("histInitialize()", "Calling histInitialize");
-  RETURN_CHECK("xAH::Algorithm::algInitialize()", xAH::Algorithm::algInitialize(), "");
-
-  return EL::StatusCode::SUCCESS;
-}
-
-
-
-EL::StatusCode JetSelector :: fileExecute ()
-{
-  // Here you do everything that needs to be done exactly once for every
-  // single file, e.g. collect a list of all lumi-blocks processed
-
-  Info("fileExecute()", "Calling fileExecute");
-
-  return EL::StatusCode::SUCCESS;
-}
-
-
-
-EL::StatusCode JetSelector :: changeInput (bool /*firstFile*/)
-{
-  // Here you do everything you need to do when we change input files,
-  // e.g. resetting branch addresses on trees.  If you are using
-  // D3PDReader or a similar service this method is not needed.
-
-  Info("changeInput()", "Calling changeInput");
-
-  return EL::StatusCode::SUCCESS;
-}
-
-
-
-EL::StatusCode JetSelector :: initialize ()
-{
-  // Here you do everything that you need to do after the first input
-  // file has been connected and before the first event is processed,
-  // e.g. create additional histograms based on which variables are
-  // available in the input files.  You can also create all of your
-  // histograms and trees in here, but be aware that this method
-  // doesn't get called if no events are processed.  So any objects
-  // you create here won't be available in the output if you have no
-  // input events.
-  Info("initialize()", "Calling initialize");
-
-  if ( m_useCutFlow ) {
-
-   // retrieve the file in which the cutflow hists are stored
-    //
-    TFile *file     = wk()->getOutputFile ("cutflow");
-
-    // retrieve the event cutflows
-    //
-    m_cutflowHist  = (TH1D*)file->Get("cutflow");
-    m_cutflowHistW = (TH1D*)file->Get("cutflow_weighted");
-    m_cutflow_bin  = m_cutflowHist->GetXaxis()->FindBin(m_name.c_str());
-    m_cutflowHistW->GetXaxis()->FindBin(m_name.c_str());
-
-    // retrieve the object cutflow
-    //
-    m_jet_cutflowHist_1 = (TH1D*)file->Get("cutflow_jets_1");
-
-    m_jet_cutflow_all             = m_jet_cutflowHist_1->GetXaxis()->FindBin("all");
-    m_jet_cutflow_cleaning_cut    = m_jet_cutflowHist_1->GetXaxis()->FindBin("cleaning_cut");
-    m_jet_cutflow_ptmax_cut       = m_jet_cutflowHist_1->GetXaxis()->FindBin("ptmax_cut");
-    m_jet_cutflow_ptmin_cut       = m_jet_cutflowHist_1->GetXaxis()->FindBin("ptmin_cut");
-    m_jet_cutflow_eta_cut         = m_jet_cutflowHist_1->GetXaxis()->FindBin("eta_cut");
-    m_jet_cutflow_jvt_cut         = m_jet_cutflowHist_1->GetXaxis()->FindBin("JVT_cut");
-    m_jet_cutflow_btag_cut        = m_jet_cutflowHist_1->GetXaxis()->FindBin("BTag_cut");
-
-  }
-
-  if ( this->configure() == EL::StatusCode::FAILURE ) {
-    Error("initialize()", "Failed to properly configure. Exiting." );
-    return EL::StatusCode::FAILURE;
+    Info("initialize()"," Decorate Jets with %s", m_decor.c_str());
   }
 
   //
@@ -409,10 +330,41 @@ EL::StatusCode JetSelector :: initialize ()
 
   }
 
-  m_event = wk()->xaodEvent();
-  m_store = wk()->xaodStore();
+  // initialize the CP::JetJvtEfficiency Tool
+  //
+  m_JVT_tool_name = "JetJvtEfficiency_effSF";
+  std::string JVT_handle_name = "CP::JetJvtEfficiency/" + m_JVT_tool_name;
+ 
+  RETURN_CHECK("MuonEfficiencyCorrector::initialize()", checkToolStore<CP::JetJvtEfficiency>(m_JVT_tool_name), "" );
+  RETURN_CHECK("MuonEfficiencyCorrector::initialize()", m_JVT_tool_handle.makeNew<CP::JetJvtEfficiency>(JVT_handle_name), "Failed to create handle to CP::JetJvtEfficiency for JVT");
+  RETURN_CHECK("MuonEfficiencyCorrector::initialize()", m_JVT_tool_handle.setProperty("WorkingPoint", m_WorkingPointJVT ),"Failed to set Working Point property of JetJvtEfficiency for JVT");
+  RETURN_CHECK("MuonEfficiencyCorrector::initialize()", m_JVT_tool_handle.initialize(), "Failed to properly initialize CP::JetJvtEfficiency for JVT");
+  
+  //  Add the chosen WP to the string labelling the vector<SF> decoration
+  //
+  m_outputSystNamesJVT = m_outputSystNamesJVT + "_JVT_" + m_WorkingPointJVT;
 
-  Info("initialize()", "Number of events in file: %lld ", m_event->getEntries() );
+  if ( m_debug ) {
+    CP::SystematicSet affectSystsJVT = m_JVT_tool_handle->affectingSystematics();
+    for ( const auto& syst_it : affectSystsJVT ) { Info("initialize()","JetJvtEfficiency tool can be affected by JVT efficiency systematic: %s", (syst_it.name()).c_str()); }
+  }
+  //
+  // Make a list of systematics to be used, based on configuration input
+  // Use HelperFunctions::getListofSystematics() for this!
+  //
+  const CP::SystematicSet recSystsJVT = m_JVT_tool_handle->recommendedSystematics();
+  m_systListJVT = HelperFunctions::getListofSystematics( recSystsJVT, m_systNameJVT, m_systValJVT, m_debug );
+
+  Info("initialize()","Will be using JetJvtEfficiency tool JVT efficiency systematic:");
+  for ( const auto& syst_it : m_systListJVT ) {
+    if ( m_systNameJVT.empty() ) {
+      Info("initialize()","\t Running w/ nominal configuration only!");
+      break;
+    }
+    Info("initialize()","\t %s", (syst_it.name()).c_str());
+  }
+
+  if(m_debug) Info("initialize()", "Number of events in file: %lld ", m_event->getEntries() );
 
   m_numEvent      = 0;
   m_numObject     = 0;
@@ -420,7 +372,7 @@ EL::StatusCode JetSelector :: initialize ()
   m_weightNumEventPass  = 0;
   m_numObjectPass = 0;
 
-  Info("initialize()", "JetSelector Interface succesfully initialized!" );
+  if(m_debug) Info("initialize()", "JetSelector Interface succesfully initialized!" );
 
   return EL::StatusCode::SUCCESS;
 }
@@ -442,12 +394,14 @@ EL::StatusCode JetSelector :: execute ()
 
   // MC event weight
   float mcEvtWeight(1.0);
-  static SG::AuxElement::Accessor< float > mcEvtWeightAcc("mcEventWeight");
-  if ( ! mcEvtWeightAcc.isAvailable( *eventInfo ) ) {
-    Error("execute()  ", "mcEventWeight is not available as decoration! Aborting" );
-    return EL::StatusCode::FAILURE;
+  if(eventInfo->eventType( xAOD::EventInfo::IS_SIMULATION ) ){
+    static SG::AuxElement::Accessor< float > mcEvtWeightAcc("mcEventWeight");
+    if ( ! mcEvtWeightAcc.isAvailable( *eventInfo ) ) {
+      Error("execute()  ", "mcEventWeight is not available as decoration! Aborting" );
+      return EL::StatusCode::FAILURE;
+    }
+    mcEvtWeight = mcEvtWeightAcc( *eventInfo );
   }
-  mcEvtWeight = mcEvtWeightAcc( *eventInfo );
 
   m_numEvent++;
 
@@ -466,8 +420,7 @@ EL::StatusCode JetSelector :: execute ()
 
     pass = executeSelection( inJets, mcEvtWeight, count, m_outContainerName);
 
-  }
-  else { // get the list of systematics to run over
+  }  else { // get the list of systematics to run over
 
     // get vector of string giving the names
     std::vector<std::string>* systNames(nullptr);
@@ -576,14 +529,105 @@ bool JetSelector :: executeSelection ( const xAOD::JetContainer* inJets,
     }
   }
 
-  if ( count ) {
-    m_numObject     += nObj;
-    m_numObjectPass += nPass;
-  }
+  // Loop over selected jets and decorate with JVT efficiency SF
+  // Do it only for MC
+  //
+  if ( m_isMC ) {
+    
+    std::vector< std::string >* sysVariationNamesJVT  = new std::vector< std::string >;
+
+    // Do it only if a tool with *this* name hasn't already been used
+    //
+    if ( !isToolAlreadyUsed(m_JVT_tool_name) ) {
+
+      for ( const auto& syst_it : m_systListJVT ) {
+         
+	// Create the name of the SF weight to be recorded
+        //   template:  SYSNAME_JVTEff_SF
+        //
+        std::string sfName = "JVTEff_SF_" + m_WorkingPointJVT;;
+        if ( !syst_it.name().empty() ) {
+           std::string prepend = syst_it.name() + "_";
+           sfName.insert( 0, prepend );
+        }
+        if ( m_debug ) { Info("executeSelection()", "JVT SF sys name (to be recorded in xAOD::TStore) is: %s", sfName.c_str()); }
+        sysVariationNamesJVT->push_back(sfName);
+
+        // apply syst
+        //
+        if ( m_JVT_tool_handle->applySystematicVariation(syst_it) != CP::SystematicCode::Ok ) {
+          Error("executeSelection()", "Failed to configure CP::JetJvtEfficiency for systematic %s", syst_it.name().c_str());
+          return EL::StatusCode::FAILURE;
+        }
+        if ( m_debug ) { Info("executeSelection()", "Successfully applied systematic: %s", syst_it.name().c_str()); }
+
+        // and now apply JVT SF!
+        //
+        unsigned int idx(0);
+        for ( auto jet : *(selectedJets) ) {
+
+           if ( m_debug ) { Info( "executeSelection()", "Applying JVT SF" ); }
+
+           // obtain JVT SF as a float (to be stored away separately)
+           //
+           //  If SF decoration vector doesn't exist, create it (will be done only for the 1st systematic for *this* jet)
+           //
+           SG::AuxElement::Decorator< std::vector<float> > sfVecJVT( m_outputSystNamesJVT );
+           if ( !sfVecJVT.isAvailable( *jet ) ) {
+             sfVecJVT( *jet ) = std::vector<float>();
+           }
+
+           float jvtSF(1.0);
+	   if ( jet->pt() < m_pt_max_JVT && fabs(jet->eta()) < m_eta_max_JVT ) {
+             if ( m_JVT_tool_handle->getEfficiencyScaleFactor( *jet, jvtSF ) != CP::CorrectionCode::Ok ) {
+               Warning( "executeSelection()", "Problem in getEfficiencyScaleFactor");
+               jvtSF = 1.0;
+             }
+	   }
+           //
+           // Add it to decoration vector
+           //
+           sfVecJVT( *jet ).push_back( jvtSF );
+
+           if ( m_debug ) {
+             Info( "executeSelection()", "===>>>");
+             Info( "executeSelection()", " ");
+             Info( "executeSelection()", "Jet %i, pt = %.2f GeV, |eta| = %.2f", idx, (jet->pt() * 1e-3), fabs(jet->eta()) );
+             Info( "executeSelection()", " ");
+             Info( "executeSelection()", "JVT SF decoration: %s", m_outputSystNamesJVT.c_str() );
+             Info( "executeSelection()", " ");
+             Info( "executeSelection()", "Systematic: %s", syst_it.name().c_str() );
+             Info( "executeSelection()", " ");
+             Info( "executeSelection()", "JVT SF:");
+             Info( "executeSelection()", "\t %f (from getEfficiencyScaleFactor())", jvtSF );
+             Info( "executeSelection()", "--------------------------------------");
+           }
+
+           ++idx;      
+	} 
+
+      } 
+      
+    } 
+
+    // Add list of JVT systematics names to TStore
+    //
+    // NB: we need to make sure that this is not pushed more than once in TStore!
+    // This will be the case when this executeSelection() function gets called for every syst varied input container,
+    // e.g. the different SC containers w/ calibration systematics upstream.
+    //
+    if ( !m_store->contains<std::vector<std::string> >(m_outputSystNamesJVT) ) { RETURN_CHECK( "JetSelector::executeSelection()", m_store->record( sysVariationNamesJVT, m_outputSystNamesJVT), "Failed to record vector of systematic names for JVT efficiency SF" ); }
+
+  } 
 
   // add ConstDataVector to TStore
   if ( m_createSelectedContainer ) {
-    RETURN_CHECK("JetSelector::execute()", m_store->record( selectedJets, outContainerName ), "Failed to store const data container.");
+    RETURN_CHECK("JetSelector::executeSelection()", m_store->record( selectedJets, outContainerName ), "Failed to store const data container.");
+  }
+
+  if ( count ) {
+    m_numObject     += nObj;
+    m_numObjectPass += nPass;
   }
 
   // apply event selection based on minimal/maximal requirements on the number of objects per event passing cuts
@@ -630,10 +674,10 @@ EL::StatusCode JetSelector :: finalize ()
   // merged.  This is different from histFinalize() in that it only
   // gets called on worker nodes that processed input events.
 
-  Info("finalize()", "%s", m_name.c_str());
+  if(m_debug) Info("finalize()", "%s", m_name.c_str());
 
   if ( m_useCutFlow ) {
-    Info("histFinalize()", "Filling cutflow");
+    if(m_debug) Info("histFinalize()", "Filling cutflow");
     m_cutflowHist ->SetBinContent( m_cutflow_bin, m_numEventPass        );
     m_cutflowHistW->SetBinContent( m_cutflow_bin, m_weightNumEventPass  );
   }
@@ -658,7 +702,7 @@ EL::StatusCode JetSelector :: histFinalize ()
   // that it gets called on all worker nodes regardless of whether
   // they processed input events.
 
-  Info("histFinalize()", "Calling histFinalize");
+  if(m_debug) Info("histFinalize()", "Calling histFinalize");
   RETURN_CHECK("xAH::Algorithm::algFinalize()", xAH::Algorithm::algFinalize(), "");
   return EL::StatusCode::SUCCESS;
 }
@@ -739,27 +783,35 @@ int JetSelector :: PassCuts( const xAOD::Jet* jet ) {
   // JVT pileup cut
   //
   if ( m_doJVT ) {
-    if ( m_debug ) { Info("PassCuts()", "Doing JVT"); }
+    if ( m_debug ) { Info("PassCuts()", "Checking JVT cut..."); }
     if ( m_debug ) {
-      if ( jet->getAttribute< float >( "Jvt" ) < m_JVTCut ) { Info("passCuts()", " pt/eta = %2f/%2f ", jet->pt() , jet->eta() ); }
+      if ( m_JVTCut > 0 && jet->getAttribute< float >( "Jvt" ) < m_JVTCut ) { Info("passCuts()", " pt/eta = %2f/%2f ", jet->pt() , jet->eta() ); }
     }
 
     if ( jet->pt() < m_pt_max_JVT ) {
-      if ( m_debug ) { Info("PassCuts()", "Checking JVT value"); }
+      if ( m_debug ) { Info("PassCuts()", "Pass JVT-pT Cut"); }
       xAOD::JetFourMom_t jetScaleP4 = jet->getAttribute< xAOD::JetFourMom_t >( m_jetScaleType.c_str() );
       if ( fabs(jetScaleP4.eta()) < m_eta_max_JVT ){
-	if(m_debug) Info("passCuts()", " Pass JVT-Eta Cut " );
-        if ( m_debug ) { Info("passCuts()", " JVT = %2f ", jet->getAttribute< float >( "Jvt" ) ); }
-        if ( jet->getAttribute< float >( "Jvt" ) < m_JVTCut ) {
-	  if ( m_debug ) { Info("passCuts()", " upper JVTCut is %2f - cutting this jet!!", m_JVTCut ); }
-          return 0;
-        }else{
-	  if ( m_debug ) { Info("passCuts()", " upper JVTCut is %2f - jet passes JVT ", m_JVTCut ); }
+	if ( m_debug ) Info("passCuts()", " Pass JVT-Eta Cut " );
+        
+	// Old usage: check manually whether this jet passes JVT cut
+	//
+	if ( m_JVTCut > 0 ) {
+	  if ( m_debug ) { Info("passCuts()", " JVT = %2f ", jet->getAttribute< float >( "Jvt" ) ); }
+          if ( jet->getAttribute< float >( "Jvt" ) < m_JVTCut ) {
+	    if ( m_debug ) { Info("passCuts()", " upper JVTCut is %2f - cutting this jet!!", m_JVTCut ); }
+            return 0;
+          } else {
+	    if ( m_debug ) { Info("passCuts()", " upper JVTCut is %2f - jet passes JVT ", m_JVTCut ); }
+	  }
+	} else {
+  	  if ( !m_JVT_tool_handle->passesJvtCut(*jet) ) { return 0; }
 	}
+
       }
     }
   } // m_doJVT
-  if(m_useCutFlow) m_jet_cutflowHist_1->Fill( m_jet_cutflow_jvt_cut, 1 );
+  if ( m_useCutFlow ) m_jet_cutflowHist_1->Fill( m_jet_cutflow_jvt_cut, 1 );
 
   //
   //  BTagging
@@ -815,17 +867,25 @@ int JetSelector :: PassCuts( const xAOD::Jet* jet ) {
   if ( m_truthLabel != -1 ) {
     if ( m_debug ) { Info("PassCuts()", "Doing Truth Label"); }
     int this_TruthLabel = 0;
+
+    static SG::AuxElement::ConstAccessor<int> HadronConeExclTruthLabelID ("HadronConeExclTruthLabelID");
     static SG::AuxElement::ConstAccessor<int> TruthLabelID ("TruthLabelID");
-    if ( TruthLabelID.isAvailable( *jet) ) {
+    static SG::AuxElement::ConstAccessor<int> PartonTruthLabelID ("PartonTruthLabelID");
+    
+    if( m_useHadronConeExcl && HadronConeExclTruthLabelID.isAvailable( *jet) ){
+      this_TruthLabel = HadronConeExclTruthLabelID(( *jet) );
+    } else if ( TruthLabelID.isAvailable( *jet) ) {
       this_TruthLabel = TruthLabelID( *jet );
+      if (this_TruthLabel == 21 || this_TruthLabel<4) this_TruthLabel = 0;
     } else {
-      static SG::AuxElement::ConstAccessor<int> PartonTruthLabelID ("PartonTruthLabelID");
       this_TruthLabel = PartonTruthLabelID( *jet );
+      if (this_TruthLabel == 21 || this_TruthLabel<4) this_TruthLabel = 0;
     }
 
+    if ( this_TruthLabel == -1 ) {return 0;}
     if ( (m_truthLabel == 5) && this_TruthLabel != 5 ) { return 0;}
     if ( (m_truthLabel == 4) && this_TruthLabel != 4 ) { return 0;}
-    if ( (m_truthLabel == 0) && !(this_TruthLabel == 21 || this_TruthLabel<4) ) { return 0;}
+    if ( (m_truthLabel == 0) && this_TruthLabel != 0 ) { return 0;}
 
   }
 

@@ -1,11 +1,12 @@
 #ifndef xAODAnaHelpers_JetHists_H
 #define xAODAnaHelpers_JetHists_H
 
-#include "xAODAnaHelpers/HistogramManager.h"
+#include "xAODAnaHelpers/IParticleHists.h"
 #include "xAODAnaHelpers/HelperClasses.h"
+#include "xAODAnaHelpers/TracksInJetHists.h"
 #include <xAODJet/JetContainer.h>
 
-class JetHists : public HistogramManager
+class JetHists : public IParticleHists
 {
   public:
 
@@ -13,39 +14,21 @@ class JetHists : public HistogramManager
     JetHists(std::string name, std::string detailStr);
     virtual ~JetHists() ;
 
-    bool m_debug;
-    StatusCode initialize();
-    StatusCode execute( const xAOD::JetContainer* jets, float eventWeight, int pvLoc = -1);
-    StatusCode execute( const xAOD::Jet* jet, float eventWeight, int pvLoc = -1 );
+    virtual StatusCode initialize();
+    virtual StatusCode execute( const xAOD::Jet* jet, float eventWeight );
+    virtual StatusCode finalize();
     using HistogramManager::book; // make other overloaded version of book() to show up in subclass
-    using HistogramManager::execute; // overload
+    using IParticleHists::execute; // overload
+    virtual void record(EL::Worker* wk);
 
   protected:
+
+    virtual StatusCode execute( const xAOD::IParticle* particle, float eventWeight );
 
     // holds bools that control which histograms are filled
     HelperClasses::JetInfoSwitch* m_infoSwitch;
 
   private:
-    //basic
-    TH1F* m_jetPt;                  //!
-    TH1F* m_jetEta;                 //!
-    TH1F* m_jetPhi;                 //!
-    TH1F* m_jetM;                   //!
-    TH1F* m_jetE;                   //!
-    TH1F* m_jetRapidity;            //!
-
-    // kinematic
-    TH1F* m_jetPx;                  //!
-    TH1F* m_jetPy;                  //!
-    TH1F* m_jetPz;                  //!
-
-    //NLeadingJets
-    std::vector< TH1F* > m_NjetsPt;       //!
-    std::vector< TH1F* > m_NjetsEta;      //!
-    std::vector< TH1F* > m_NjetsPhi;      //!
-    std::vector< TH1F* > m_NjetsM;        //!
-    std::vector< TH1F* > m_NjetsE;        //!
-    std::vector< TH1F* > m_NjetsRapidity; //!
 
     // clean
     TH1F* m_jetTime;                //!
@@ -103,6 +86,7 @@ class JetHists : public HistogramManager
 
     // truth jets
     TH1F* m_truthLabelID;          //!
+    TH1F* m_hadronConeExclTruthLabelID;          //!
     TH1F* m_truthCount;            //!
     TH1F* m_truthPt;               //!
     TH1F* m_truthDr_B;             //!
@@ -133,13 +117,22 @@ class JetHists : public HistogramManager
     TH1F* m_MV2c00   ; //!
     TH1F* m_MV2c10   ; //!
     TH1F* m_MV2c20   ; //!
+    TH1F* m_MV2c20_l ; //!
     TH1F* m_COMB   ; //!
     TH1F* m_SV0             ; //!
-    TH1F* m_SV1             ; //!
-    TH1F* m_IP2D            ; //!
-    TH1F* m_IP3D            ; //!
     TH1F* m_JetFitter       ; //!
     TH1F* m_JetFitterCombNN ; //!
+
+    TH1F* m_trkSum_ntrk     ; //!
+    TH1F* m_trkSum_sPt      ; //!
+    TH1F* m_trkSum_vPt      ; //!
+    TH1F* m_trkSum_vAbsEta  ; //!
+    TH1F* m_width           ; //!
+    TH1F* m_n_trk_sigd0cut  ; //!
+    TH1F* m_trk3_d0sig      ; //!
+    TH1F* m_trk3_z0sig      ; //!
+    TH1F* m_sv_scaled_efc   ; //!
+    TH1F* m_jf_scaled_efc   ; //!
 
     TH1F* m_jf_nVTX           ; //!
     TH1F* m_jf_nSingleTracks  ; //!
@@ -148,11 +141,16 @@ class JetHists : public HistogramManager
     TH1F* m_jf_energyFraction ; //!
     TH1F* m_jf_significance3d ; //!
     TH1F* m_jf_deltaeta       ; //!
+    TH1F* m_jf_deltaeta_l     ; //!
     TH1F* m_jf_deltaphi       ; //!
+    TH1F* m_jf_deltaphi_l     ; //!
+    TH1F* m_jf_deltaR         ; //!
     TH1F* m_jf_N2Tpar         ; //!
     TH1F* m_jf_pb             ; //!
     TH1F* m_jf_pc             ; //!
     TH1F* m_jf_pu             ; //!
+    TH1F* m_jf_mass_unco      ; //!
+    TH1F* m_jf_dR_flight      ; //!
 
     TH1F* m_sv0_NGTinSvx ; //!
     TH1F* m_sv0_N2Tpair  ; //!
@@ -160,11 +158,21 @@ class JetHists : public HistogramManager
     TH1F* m_sv0_efracsvx ; //!
     TH1F* m_sv0_normdist ; //!
 
+    TH1F* m_SV1_pu       ; //!
+    TH1F* m_SV1_pb       ; //!
+    TH1F* m_SV1_pc       ; //!
+    TH1F* m_SV1          ; //!
+    TH1F* m_SV1_c        ; //!
+    TH1F* m_SV1_cu       ; //!
     TH1F* m_sv1_NGTinSvx ; //!
     TH1F* m_sv1_N2Tpair  ; //!
     TH1F* m_sv1_massvx   ; //!
     TH1F* m_sv1_efracsvx ; //!
     TH1F* m_sv1_normdist ; //!
+    TH1F* m_SV1_Lxy        ; //!
+    TH1F* m_SV1_L3d        ; //!
+    TH1F* m_SV1_distmatlay ; //!
+    TH1F* m_SV1_dR         ; //!
 
     TH1F* m_nIP2DTracks              ; //!
     TH1F* m_IP2D_gradeOfTracks       ; //!
@@ -175,6 +183,12 @@ class JetHists : public HistogramManager
     TH1F* m_IP2D_weightBofTracks     ; //!
     TH1F* m_IP2D_weightCofTracks     ; //!
     TH1F* m_IP2D_weightUofTracks     ; //!
+    TH1F* m_IP2D_pu                  ; //!
+    TH1F* m_IP2D_pb                  ; //!
+    TH1F* m_IP2D_pc                  ; //!
+    TH1F* m_IP2D                     ; //!
+    TH1F* m_IP2D_c                   ; //!
+    TH1F* m_IP2D_cu                  ; //!
 
     TH1F* m_nIP3DTracks              ; //!
     TH1F* m_IP3D_gradeOfTracks       ; //!
@@ -188,6 +202,12 @@ class JetHists : public HistogramManager
     TH1F* m_IP3D_weightBofTracks     ; //!
     TH1F* m_IP3D_weightCofTracks     ; //!
     TH1F* m_IP3D_weightUofTracks     ; //!
+    TH1F* m_IP3D_pu                  ; //!
+    TH1F* m_IP3D_pb                  ; //!
+    TH1F* m_IP3D_pc                  ; //!
+    TH1F* m_IP3D                     ; //!
+    TH1F* m_IP3D_c                   ; //!
+    TH1F* m_IP3D_cu                  ; //!
 
     // substructure
     TH1F* m_tau1; //!
@@ -201,6 +221,10 @@ class JetHists : public HistogramManager
     TH1F* m_tau21_wta; //!
     TH1F* m_tau32_wta; //!
     TH1F* m_numConstituents; //!
+
+    // Tracks in Jets
+    TH1F* m_nTrk; //!
+    TracksInJetHists* m_tracksInJet; //!
 };
 
 #endif

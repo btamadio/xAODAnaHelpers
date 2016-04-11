@@ -1,3 +1,13 @@
+/**
+ * @file   BasicEventSelection.h
+ * @author Gabriel Facini <gabriel.facini@cern.ch>
+ * @author Marco Milesi <marco.milesi@cern.ch>
+ * @author Jeff Dandoy <jeff.dandoy@cern.ch>
+ * @author John Alison <john.alison@cern.ch>
+ * @brief  Algorithm performing general basic cuts for an analysis (GRL, Event Cleaning, Min nr. Tracks for PV candidate).
+ *
+ */
+
 #ifndef xAODAnaHelpers_BasicEventSelection_H
 #define xAODAnaHelpers_BasicEventSelection_H
 
@@ -7,6 +17,7 @@
 // rootcore includes
 #include "GoodRunsLists/GoodRunsListSelectionTool.h"
 #include "PileupReweighting/PileupReweightingTool.h"
+#include "AsgTools/AnaToolHandle.h"
 
 // algorithm wrapper
 #include "xAODAnaHelpers/Algorithm.h"
@@ -63,15 +74,26 @@ class BasicEventSelection : public xAH::Algorithm
     std::string m_derivationName;
     bool m_useMetaData;
 
+    /* Output Stream Names */
+
+    /*
+        The following public variables allow for rerouting of the
+        metadata and cutflow histograms to non-default output
+        streams. E.g. can combine all outputs into a single stream
+    */
+
+    std::string m_metaDataStreamName;
+    std::string m_cutFlowStreamName;
+
     /* Check for duplicated events in Data and MC */
     bool m_checkDuplicatesData;
     bool m_checkDuplicatesMC;
     std::set<std::pair<uint32_t,uint32_t> > m_RunNr_VS_EvtNr;
 
   private:
-    GoodRunsListSelectionTool*   m_grl;        //!
-    CP::PileupReweightingTool*   m_pileuptool; //!
 
+    GoodRunsListSelectionTool*   m_grl;        //!
+    asg::AnaToolHandle<CP::IPileupReweightingTool>   m_pileup_tool_handle; //!
     TrigConf::xAODConfigTool*    m_trigConfTool;  //!
     Trig::TrigDecisionTool*      m_trigDecTool;   //!
 
@@ -132,9 +154,6 @@ class BasicEventSelection : public xAH::Algorithm
     virtual EL::StatusCode postExecute ();
     virtual EL::StatusCode finalize ();
     virtual EL::StatusCode histFinalize ();
-
-    // these are the functions not inherited from Algorithm
-    virtual EL::StatusCode configure ();
 
     /// @cond
     // this is needed to distribute the algorithm to the workers

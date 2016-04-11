@@ -48,6 +48,7 @@ int HelperFunctions::getPrimaryVertexLocation(const xAOD::VertexContainer* verte
     }
     location++;
   }
+  Warning("HelperFunctions::getPrimaryVertexLocation()","No primary vertex location was found! Returning -1");
   return -1;
 }
 
@@ -320,9 +321,18 @@ const xAOD::Vertex* HelperFunctions::getPrimaryVertex(const xAOD::VertexContaine
     if(vtx_itr->vertexType() != xAOD::VxType::VertexType::PriVtx) { continue; }
     return vtx_itr;
   }
+  Warning("HelperFunctions::getPrimaryVertex()","No primary vertex was found! Returning nullptr");
 
   return 0;
 }
+
+float HelperFunctions::getPrimaryVertexZ(const xAOD::Vertex* pvx)
+{
+  float pvx_z = 0;
+  if(pvx) pvx_z = pvx->z();
+  return pvx_z;
+}
+
 
 bool HelperFunctions::sort_pt(xAOD::IParticle* partA, xAOD::IParticle* partB){
   return partA->pt() > partB->pt();
@@ -424,3 +434,11 @@ std::vector< CP::SystematicSet > HelperFunctions::getListofSystematics(const CP:
 }
 
 
+
+float HelperFunctions::dPhi(float phi1, float phi2)
+{
+  float dPhi = phi1 - phi2;
+  if(dPhi > 3.14)  dPhi -= 2*3.14;
+  if(dPhi < -3.14) dPhi += 2*3.14;
+  return dPhi;
+}

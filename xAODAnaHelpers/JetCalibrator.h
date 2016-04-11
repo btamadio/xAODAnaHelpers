@@ -46,6 +46,8 @@ public:
   std::string m_JESUncertMCType;
   bool m_setAFII;
 
+  bool m_isTrigger; // whether the jet collection is trigger or not (soon: different calibrations)
+
   std::string m_JERUncertConfig;
   bool m_JERFullSys;
   bool m_JERApplyNominal;
@@ -71,9 +73,6 @@ private:
 
   bool m_isMC;            //!
   bool m_isFullSim;       //!
-
-  std::string m_outSCContainerName;     //!
-  std::string m_outSCAuxContainerName;  //!
 
   std::vector<CP::SystematicSet> m_systList; //!
   std::vector<int> m_systType; //!
@@ -116,10 +115,6 @@ public:
   virtual EL::StatusCode postExecute ();
   virtual EL::StatusCode finalize ();
   virtual EL::StatusCode histFinalize ();
-
-  // these are the functions not inherited from Algorithm
-  virtual EL::StatusCode configure ();
-
 
   /// @cond
   // this is needed to distribute the algorithm to the workers

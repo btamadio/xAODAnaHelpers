@@ -1,18 +1,3 @@
-/********************************************************
- *
- * Basic event selection. Performs general simple cuts
- * (GRL, Event Cleaning, Min nr. Tracks for PV candidate)
- *
- * G. Facini (gabriel.facini@cern.ch)
- * M. Milesi (marco.milesi@cern.ch)
- * J. Dandoy (jeff.dandoy@cern.ch)
- * J. Alison (john.alison@cern.ch)
- *
- *******************************************************/
-
-//#include "PATInterfaces/CorrectionCode.h"
-//#include "AsgTools/StatusCode.h"
-
 // EL include(s):
 #include <EventLoop/Job.h>
 #include <EventLoop/Worker.h>
@@ -31,9 +16,9 @@
 #include "TrigConfxAOD/xAODConfigTool.h"
 #include "TrigDecisionTool/TrigDecisionTool.h"
 #include "PATInterfaces/CorrectionCode.h"
+//#include "AsgTools/StatusCode.h"
 
 // ROOT include(s):
-#include "TEnv.h"
 #include "TFile.h"
 #include "TTree.h"
 #include "TTreeFormula.h"
@@ -47,7 +32,7 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
     Algorithm(className),
     m_PU_default_channel(0),
     m_grl(nullptr),
-    m_pileuptool(nullptr),
+    m_pileup_tool_handle("CP::PileupReweightingTool/PileupToolName", nullptr),
     m_trigConfTool(nullptr),
     m_trigDecTool(nullptr),
     m_histEventCount(nullptr),
@@ -81,12 +66,16 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
   // Metadata
   m_useMetaData = true;
 
+  // Output Stream Names
+  m_metaDataStreamName = "metadata";
+  m_cutFlowStreamName = "cutflow";
+
   // Check for duplicated events in Data and MC
   m_checkDuplicatesData = false;
   m_checkDuplicatesMC	= false;
 
   // GRL
-  m_applyGRLCut = true;
+  m_applyGRLCut = false;
   m_GRLxml = "$ROOTCOREBIN/data/xAODAnaHelpers/data15_13TeV.periodAllYear_HEAD_DQDefects-00-01-02_PHYS_StandardGRL_Atlas_Ready.xml";
   //https://twiki.cern.ch/twiki/bin/viewauth/AtlasProtected/GoodRunListsForAnalysis
   m_GRLExcludeList = "";
@@ -102,12 +91,12 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
 
   // Primary Vertex
   m_vertexContainerName = "PrimaryVertices";
-  m_applyPrimaryVertexCut = true;
+  m_applyPrimaryVertexCut = false;
   // number of tracks to require to count PVs
   m_PVNTrack = 2; // harmonized cut
 
   // Event Cleaning
-  m_applyEventCleaningCut = true;
+  m_applyEventCleaningCut = false;
   m_applyCoreFlagsCut     = false;
 
   // Trigger
@@ -122,98 +111,6 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
   //StatusCode::enableFailure();
 }
 
-
-EL::StatusCode BasicEventSelection :: configure ()
-{
-
-  if ( !getConfig().empty() ) {
-
-    // read in user configuration from text file
-    TEnv *config = new TEnv(getConfig(true).c_str());
-    if ( !config ) {
-      Error("BasicEventSelection()", "Failed to initialize reading of config file. Exiting." );
-      return EL::StatusCode::FAILURE;
-    }
-
-    // basics
-    m_debug             = config->GetValue("Debug"     ,     m_debug);
-    m_truthLevelOnly    = config->GetValue("TruthLevelOnly", m_truthLevelOnly);
-
-    // derivation name
-    m_derivationName    = config->GetValue("DerivationName", m_derivationName.c_str() );
-    // temp flag for derivations with broken meta data
-    m_useMetaData       = config->GetValue("UseMetaData", m_useMetaData);
-
-    // Check for duplicated events in Data and MC
-    m_checkDuplicatesData = config->GetValue("CheckDuplicatesData", m_checkDuplicatesData);
-    m_checkDuplicatesMC   = config->GetValue("CheckDuplicatesMC", m_checkDuplicatesMC);
-
-    // GRL
-    m_applyGRLCut       = config->GetValue("ApplyGRL",        m_applyGRLCut);
-    m_applyGRLCut       = config->GetValue("ApplyGRLCut",        m_applyGRLCut);
-    m_GRLxml            = config->GetValue("GRL", m_GRLxml.c_str());
-    m_GRLExcludeList    = config->GetValue("GRLExclude", m_GRLExcludeList.c_str());
-
-    // Pileup Reweighting
-    m_doPUreweighting    = config->GetValue("DoPileupReweighting", m_doPUreweighting);
-    m_lumiCalcFileNames  = config->GetValue("LumiCalcFiles",       m_lumiCalcFileNames.c_str());
-    m_PRWFileNames       = config->GetValue("PRWFiles",            m_PRWFileNames.c_str());
-    m_PU_default_channel = config->GetValue("PUDefaultChannel",    m_PU_default_channel);
-
-    // Event Cleaning
-    m_applyEventCleaningCut      = config->GetValue("ApplyEventCleaningCut",    m_applyEventCleaningCut);
-    m_applyCoreFlagsCut          = config->GetValue("ApplyCoreFlagsCut",        m_applyCoreFlagsCut);
-
-    // Primary Vertex
-    m_vertexContainerName        = config->GetValue("VertexContainer",       m_vertexContainerName.c_str());
-    m_applyPrimaryVertexCut      = config->GetValue("ApplyPrimaryVertexCut", m_applyPrimaryVertexCut);
-    // number of tracks to require to count PVs
-    m_PVNTrack                   = config->GetValue("NTrackForPrimaryVertex",  m_PVNTrack);
-
-    // Trigger
-    m_triggerSelection           = config->GetValue("Trigger",            m_triggerSelection.c_str());
-    m_applyTriggerCut            = config->GetValue("ApplyTriggerCut",    m_applyTriggerCut);
-    m_storeTrigDecisions         = config->GetValue("StoreTrigDecision",  m_storeTrigDecisions);
-    m_storePassL1                = config->GetValue("StorePassL1",        m_storePassL1);
-    m_storePassHLT               = config->GetValue("StorePassHLT",       m_storePassHLT);
-    m_storeTrigKeys              = config->GetValue("StoreTrigKeys",      m_storeTrigKeys);
-
-    // if truth level make sure parameters are set properly
-    if( m_truthLevelOnly ) {
-      Info("configure()", "Truth only! Turn off trigger stuff");
-      m_triggerSelection = "";
-      m_applyTriggerCut = m_storeTrigDecisions = m_storePassL1 = m_storePassHLT = m_storeTrigKeys = false;
-      Info("configure()", "Truth only! Turn off GRL");
-      m_applyGRLCut = false;
-      Info("configure()", "Truth only! Turn off Pile-up Reweight");
-      m_doPUreweighting = false;
-    }
-
-    if( !m_triggerSelection.empty() )
-      Info("configure()", "Using Trigger %s", m_triggerSelection.c_str() );
-    if( !m_applyTriggerCut )
-      Info("configure()", "WILL NOT CUT ON TRIGGER AS YOU REQUESTED!");
-
-    if( m_doPUreweighting ){
-      if( m_lumiCalcFileNames.size() == 0){
-        Error("BasicEventSelection()", "Pileup Reweighting is requested but no LumiCalc file is specified. Exiting" );
-        return EL::StatusCode::FAILURE;
-      }
-      if( m_PRWFileNames.size() == 0){
-        Error("BasicEventSelection()", "Pileup Reweighting is requested but no PRW file is specified. Exiting" );
-        return EL::StatusCode::FAILURE;
-      }
-    }
-
-    config->Print();
-
-    Info("configure()", "BasicEventSelection succesfully configured! ");
-
-    delete config; config = nullptr;
-  }
-
-  return EL::StatusCode::SUCCESS;
-}
 
 EL::StatusCode BasicEventSelection :: setupJob (EL::Job& job)
 {
@@ -231,10 +128,12 @@ EL::StatusCode BasicEventSelection :: setupJob (EL::Job& job)
   // let's initialize the algorithm to use the xAODRootAccess package
   xAOD::Init("BasicEventSelection").ignore(); // call before opening first file
 
-  EL::OutputStream outForCFlow("cutflow");
-  job.outputAdd ( outForCFlow );
-  EL::OutputStream outForMetadata("metadata");
-  job.outputAdd ( outForMetadata );
+
+  EL::OutputStream outForCFlow(m_cutFlowStreamName);
+  if(!job.outputHas(m_cutFlowStreamName) ){job.outputAdd ( outForCFlow );}
+
+  EL::OutputStream outForMetadata(m_metaDataStreamName);
+  if(!job.outputHas(m_metaDataStreamName) ){job.outputAdd ( outForMetadata );}
 
   return EL::StatusCode::SUCCESS;
 }
@@ -251,13 +150,8 @@ EL::StatusCode BasicEventSelection :: histInitialize ()
   Info("histInitialize()", "Calling histInitialize");
   RETURN_CHECK("xAH::Algorithm::algInitialize()", xAH::Algorithm::algInitialize(), "");
 
-  // Make sure configuration variables have been configured
-  if ( !getConfig().empty() && ( this->configure() == EL::StatusCode::FAILURE ) ) {
-    Error("histInitialize()", "Failed to properly configure. Exiting." );
-    return EL::StatusCode::FAILURE;
-  }
-
   // write the metadata hist to this file so algos downstream can pick up the pointer
+
   TFile *fileMD = wk()->getOutputFile ("tree");
   fileMD->cd();
 
@@ -314,106 +208,99 @@ EL::StatusCode BasicEventSelection :: fileExecute ()
   //check if file is from a DxAOD
   bool m_isDerivation = !MetaData->GetBranch("StreamAOD");
 
-  if ( m_isDerivation && m_useMetaData ) {
+  if (  m_useMetaData ) {
 
-    // check for corruption
-    //
-    // If there are some Incomplete CBK, throw a FAILURE,
-    // unless ALL of them have inputStream == "unknownStream"
-    //
-    const xAOD::CutBookkeeperContainer* incompleteCBC(nullptr);
-    if ( !m_event->retrieveMetaInput(incompleteCBC, "IncompleteCutBookkeepers").isSuccess() ) {
-      Error("initializeEvent()","Failed to retrieve IncompleteCutBookkeepers from MetaData! Exiting.");
-      return EL::StatusCode::FAILURE;
-    }
-    bool allFromUnknownStream(true);
-    if ( incompleteCBC->size() != 0 ) {
-
-      for ( auto cbk : *incompleteCBC ) {
-	if ( cbk->inputStream() != "unknownStream" ) {
-	  allFromUnknownStream = false;
-	  break;
-	}
+      // Check for potential file corruption
+      //
+      // If there are some Incomplete CBK, throw a WARNING,
+      // unless ALL of them have inputStream == "unknownStream"
+      //
+      const xAOD::CutBookkeeperContainer* incompleteCBC(nullptr);
+      if ( !m_event->retrieveMetaInput(incompleteCBC, "IncompleteCutBookkeepers").isSuccess() ) {
+	  Error("fileExecute()","Failed to retrieve IncompleteCutBookkeepers from MetaData! Exiting.");
+	  return EL::StatusCode::FAILURE;
       }
-      if ( !allFromUnknownStream ) {
-	Error("initializeEvent()","Found incomplete Bookkeepers! Check file for corruption.");
-	return EL::StatusCode::FAILURE;
+      bool allFromUnknownStream(true);
+      if ( incompleteCBC->size() != 0 ) {
+
+	  std::string stream("");
+	  for ( auto cbk : *incompleteCBC ) {
+	      Info ("fileExecute()", "Incomplete cbk name: %s - stream: %s ", (cbk->name()).c_str(), (cbk->inputStream()).c_str());
+	      if ( cbk->inputStream() != "unknownStream" ) {
+		  allFromUnknownStream = false;
+		  stream = cbk->inputStream();
+		  break;
+	      }
+	  }
+	  if ( !allFromUnknownStream ) { Warning("fileExecute()","Found incomplete Bookkeepers from stream: %s ! Check input file for potential corruption...", stream.c_str() ); }
+
       }
 
-    }
-
-    // Now, let's find the actual information
-    //
-    const xAOD::CutBookkeeperContainer* completeCBC(nullptr);
-    if ( !m_event->retrieveMetaInput(completeCBC, "CutBookkeepers").isSuccess() ) {
-      Error("fileExecute()","Failed to retrieve CutBookkeepers from MetaData! Exiting.");
-      return EL::StatusCode::FAILURE;
-    }
-
-    // Find the smallest cycle number, the original first processing step/cycle
-    int minCycle(10000);
-    for ( auto cbk : *completeCBC ) {
-      if ( !( cbk->name().empty() )  && ( minCycle > cbk->cycle() ) ){ minCycle = cbk->cycle(); }
-    }
-
-    // Now, let's actually find the right one that contains all the needed info...
-    const xAOD::CutBookkeeper* allEventsCBK(nullptr);
-    const xAOD::CutBookkeeper* DxAODEventsCBK(nullptr);
-    std::string derivationName = m_derivationName + "Kernel";
-
-    if ( m_debug ) { Info("fileExecute()","Looking at DAOD made by Derivation Algorithm: %s", derivationName.c_str()); }
-
-    int maxCycle(-1);
-    for ( const auto& cbk: *completeCBC ) {
-      if ( cbk->cycle() > maxCycle && cbk->name() == "AllExecutedEvents" && cbk->inputStream() == "StreamAOD" ) {
- 	allEventsCBK = cbk;
- 	maxCycle = cbk->cycle();
+      // Now, let's find the actual information
+      //
+      const xAOD::CutBookkeeperContainer* completeCBC(nullptr);
+      if ( !m_event->retrieveMetaInput(completeCBC, "CutBookkeepers").isSuccess() ) {
+	  Error("fileExecute()","Failed to retrieve CutBookkeepers from MetaData! Exiting.");
+	  return EL::StatusCode::FAILURE;
       }
-      if ( cbk->name() == derivationName ) {
- 	 DxAODEventsCBK = cbk;
+
+      // Find the smallest cycle number, the original first processing step/cycle
+      int minCycle(10000);
+      for ( auto cbk : *completeCBC ) {
+	  if ( !( cbk->name().empty() )  && ( minCycle > cbk->cycle() ) ){ minCycle = cbk->cycle(); }
       }
-    }
 
-    m_MD_initialNevents     = allEventsCBK->nAcceptedEvents();
-    m_MD_initialSumW        = allEventsCBK->sumOfEventWeights();
-    m_MD_initialSumWSquared = allEventsCBK->sumOfEventWeightsSquared();
+      // Now, let's actually find the right one that contains all the needed info...
+      const xAOD::CutBookkeeper* allEventsCBK(nullptr);
+      const xAOD::CutBookkeeper* DxAODEventsCBK(nullptr);
 
-    m_MD_finalNevents       = DxAODEventsCBK->nAcceptedEvents();
-    m_MD_finalSumW          = DxAODEventsCBK->sumOfEventWeights();
-    m_MD_finalSumWSquared   = DxAODEventsCBK->sumOfEventWeightsSquared();
+      if ( m_isDerivation ) { Info("fileExecute()","Looking at DAOD made by Derivation Algorithm: %s", m_derivationName.c_str()); }
 
-  } else {
+      int maxCycle(-1);
+      for ( const auto& cbk: *completeCBC ) {
+	  Info ("fileExecute()", "Complete cbk name: %s - stream: %s", (cbk->name()).c_str(), (cbk->inputStream()).c_str() );
+	  if ( cbk->cycle() > maxCycle && cbk->name() == "AllExecutedEvents" && cbk->inputStream() == "StreamAOD" ) {
+	      allEventsCBK = cbk;
+	      maxCycle = cbk->cycle();
+	  }
+	  if ( m_isDerivation ) {
+	      if ( cbk->name() == m_derivationName ) {
+		  DxAODEventsCBK = cbk;
+	      }
+	  }
+      }
 
-    // if not using a DAOD (or explicitly vetoing check on metadata),
-    // simply retrieve the tree entries and weight
-    //
-    const TTree* CollectionTree = static_cast<const TTree*>( wk()->inputFile()->Get("CollectionTree") );
+      m_MD_initialNevents     = allEventsCBK->nAcceptedEvents();
+      m_MD_initialSumW	      = allEventsCBK->sumOfEventWeights();
+      m_MD_initialSumWSquared = allEventsCBK->sumOfEventWeightsSquared();
 
-    if(CollectionTree){
-        m_MD_finalNevents       = m_MD_initialNevents     = CollectionTree->GetEntries();
-        m_MD_finalSumW          = m_MD_initialSumW        = CollectionTree->GetWeight() * CollectionTree->GetEntries();
-        m_MD_finalSumWSquared   = m_MD_initialSumWSquared = ( CollectionTree->GetWeight() * CollectionTree->GetWeight() ) * CollectionTree->GetEntries();
-    } else {
-        Info("fileExecute()", "File contains no CollectionTree. No MetaData retrievable.");
-    }
+      if ( !DxAODEventsCBK ) {
+        Error("fileExecute()", "No CutBookkeeper corresponds to the selected Derivation Framework algorithm name. Check it with your DF experts! Aborting.");
+        return EL::StatusCode::FAILURE;
+      }
+
+      m_MD_finalNevents	      = ( m_isDerivation ) ? DxAODEventsCBK->nAcceptedEvents() : m_MD_initialNevents;
+      m_MD_finalSumW	      = ( m_isDerivation ) ? DxAODEventsCBK->sumOfEventWeights() : m_MD_initialSumW;
+      m_MD_finalSumWSquared   = ( m_isDerivation ) ? DxAODEventsCBK->sumOfEventWeightsSquared() : m_MD_initialSumWSquared;
+
+      // Write metadata event bookkeepers to histogram
+      //
+      Info("fileExecute()", "Meta data from this file:");
+      Info("fileExecute()", "Initial  events  = %u",	     static_cast<unsigned int>(m_MD_initialNevents) );
+      Info("fileExecute()", "Selected events  = %u",	     static_cast<unsigned int>(m_MD_finalNevents) );
+      Info("fileExecute()", "Initial  sum of weights = %f",	 m_MD_initialSumW);
+      Info("fileExecute()", "Selected sum of weights = %f",	 m_MD_finalSumW);
+      Info("fileExecute()", "Initial  sum of weights squared = %f", m_MD_initialSumWSquared);
+      Info("fileExecute()", "Selected sum of weights squared = %f", m_MD_finalSumWSquared);
+
+      m_histEventCount -> Fill(1, m_MD_initialNevents);
+      m_histEventCount -> Fill(2, m_MD_finalNevents);
+      m_histEventCount -> Fill(3, m_MD_initialSumW);
+      m_histEventCount -> Fill(4, m_MD_finalSumW);
+      m_histEventCount -> Fill(5, m_MD_initialSumWSquared);
+      m_histEventCount -> Fill(6, m_MD_finalSumWSquared);
+
   }
-
-  // Write metadata event bookkeepers to histogram
-  //
-  Info("histInitialize()", "Meta data from this file:");
-  Info("histInitialize()", "Initial  events	 = %u",            static_cast<unsigned int>(m_MD_initialNevents) );
-  Info("histInitialize()", "Selected events	 = %u",            static_cast<unsigned int>(m_MD_finalNevents) );
-  Info("histInitialize()", "Initial  sum of weights = %f",         m_MD_initialSumW);
-  Info("histInitialize()", "Selected sum of weights = %f",         m_MD_finalSumW);
-  Info("histInitialize()", "Initial  sum of weights squared = %f", m_MD_initialSumWSquared);
-  Info("histInitialize()", "Selected sum of weights squared = %f", m_MD_finalSumWSquared);
-
-  m_histEventCount -> Fill(1, m_MD_initialNevents);
-  m_histEventCount -> Fill(2, m_MD_finalNevents);
-  m_histEventCount -> Fill(3, m_MD_initialSumW);
-  m_histEventCount -> Fill(4, m_MD_finalSumW);
-  m_histEventCount -> Fill(5, m_MD_initialSumWSquared);
-  m_histEventCount -> Fill(6, m_MD_finalSumWSquared);
 
   return EL::StatusCode::SUCCESS;
 
@@ -442,6 +329,17 @@ EL::StatusCode BasicEventSelection :: initialize ()
 
   Info("initialize()", "Initializing BasicEventSelection... ");
 
+  // if truth level make sure parameters are set properly
+  if( m_truthLevelOnly ) {
+    Info("initialize()", "Truth only! Turn off trigger stuff");
+    m_triggerSelection = "";
+    m_applyTriggerCut = m_storeTrigDecisions = m_storePassL1 = m_storePassHLT = m_storeTrigKeys = false;
+    Info("initialize()", "Truth only! Turn off GRL");
+    m_applyGRLCut = false;
+    Info("initialize()", "Truth only! Turn off Pile-up Reweight");
+    m_doPUreweighting = false;
+  }
+
   const xAOD::EventInfo* eventInfo(nullptr);
   RETURN_CHECK("BasicEventSelection::initialize()", HelperFunctions::retrieve(eventInfo, m_eventInfoContainerName, m_event, m_store, m_verbose) ,"");
 
@@ -468,46 +366,48 @@ EL::StatusCode BasicEventSelection :: initialize ()
 
   // write the cutflows to this file so algos downstream can pick up the pointer
   //
-  TFile *fileCF = wk()->getOutputFile ("cutflow");
+  TFile *fileCF = wk()->getOutputFile (m_cutFlowStreamName);
   fileCF->cd();
 
-  // initialise event cutflow, which will be picked ALSO by the algos downstream where an event selection is applied (or at least can be applied)
+  // Note: the following code is needed for anyone developing/running in ROOT 6.04.10+
+  // Bin extension is not done anymore via TH1::SetBit(TH1::kCanRebin), but with TH1::SetCanExtend(TH1::kAllAxes)
+
+  //initialise event cutflow, which will be picked ALSO by the algos downstream where an event selection is applied (or at least can be applied)
   //
   // use 1,1,2 so Fill(bin) and GetBinContent(bin) refer to the same bin
   //
   m_cutflowHist  = new TH1D("cutflow", "cutflow", 1, 1, 2);
-  m_cutflowHist->SetBit(TH1::kCanRebin);
+  m_cutflowHist->SetCanExtend(TH1::kAllAxes);
   // use 1,1,2 so Fill(bin) and GetBinContent(bin) refer to the same bin
   //
   m_cutflowHistW = new TH1D("cutflow_weighted", "cutflow_weighted", 1, 1, 2);
-  m_cutflowHistW->SetBit(TH1::kCanRebin);
+  m_cutflowHistW->SetCanExtend(TH1::kAllAxes);
 
   // initialise object cutflows, which will be picked by the object selector algos downstream and filled.
   //
   m_el_cutflowHist_1     = new TH1D("cutflow_electrons_1", "cutflow_electrons_1", 1, 1, 2);
-  m_el_cutflowHist_1->SetBit(TH1::kCanRebin);
+  m_el_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
   m_el_cutflowHist_2     = new TH1D("cutflow_electrons_2", "cutflow_electrons_2", 1, 1, 2);
-  m_el_cutflowHist_2->SetBit(TH1::kCanRebin);
+  m_el_cutflowHist_2->SetCanExtend(TH1::kAllAxes);
   m_mu_cutflowHist_1     = new TH1D("cutflow_muons_1", "cutflow_muons_1", 1, 1, 2);
-  m_mu_cutflowHist_1->SetBit(TH1::kCanRebin);
+  m_mu_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
   m_mu_cutflowHist_2     = new TH1D("cutflow_muons_2", "cutflow_muons_2", 1, 1, 2);
-  m_mu_cutflowHist_2->SetBit(TH1::kCanRebin);
+  m_mu_cutflowHist_2->SetCanExtend(TH1::kAllAxes);
   m_ph_cutflowHist_1     = new TH1D("cutflow_photons_1", "cutflow_photons_1", 1, 1, 2);
-  m_ph_cutflowHist_1->SetBit(TH1::kCanRebin);
+  m_ph_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
   m_tau_cutflowHist_1     = new TH1D("cutflow_taus_1", "cutflow_taus_1", 1, 1, 2);
-  m_tau_cutflowHist_1->SetBit(TH1::kCanRebin);
+  m_tau_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
   m_tau_cutflowHist_2     = new TH1D("cutflow_taus_2", "cutflow_taus_2", 1, 1, 2);
-  m_tau_cutflowHist_2->SetBit(TH1::kCanRebin);
+  m_tau_cutflowHist_2->SetCanExtend(TH1::kAllAxes);
   m_jet_cutflowHist_1    = new TH1D("cutflow_jets_1", "cutflow_jets_1", 1, 1, 2);
-  m_jet_cutflowHist_1->SetBit(TH1::kCanRebin);
+  m_jet_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
   m_truth_cutflowHist_1  = new TH1D("cutflow_truths_1", "cutflow_truths_1", 1, 1, 2);
-  m_truth_cutflowHist_1->SetBit(TH1::kCanRebin);
+  m_truth_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
 
   // start labelling the bins for the event cutflow
   //
   m_cutflow_all  = m_cutflowHist->GetXaxis()->FindBin("all");
   m_cutflowHistW->GetXaxis()->FindBin("all");
-
 
   if ( !m_isMC ) {
     if ( m_applyGRLCut ) {
@@ -552,9 +452,6 @@ EL::StatusCode BasicEventSelection :: initialize ()
   //
 
   if ( m_doPUreweighting ) {
-    m_pileuptool = new CP::PileupReweightingTool("Pileup");
-
-    //m_pileuptool->EnableDebugging(true);
 
     std::vector<std::string> PRWFiles;
     std::vector<std::string> lumiCalcFiles;
@@ -586,23 +483,30 @@ EL::StatusCode BasicEventSelection :: initialize ()
         tmp_lumiCalcFileNames.erase(0, pos+1);
       }
     }
-    Info("initialize()", "CP::PileupReweightingTool is adding Pileup files:");
+    Info("initialize()", "Adding Pileup files for CP::PileupReweightingTool:");
     for( unsigned int i=0; i < PRWFiles.size(); ++i){
       //      PRWFiles.at(i) = gSystem->ExpandPathName(PRWFiles.at(i).c_str());
       printf( "\t %s \n", PRWFiles.at(i).c_str() );
     }
-    Info("initialize()", "CP::PileupReweightingTool is adding LumiCalc files:");
+    Info("initialize()", "Adding LumiCalc files for CP::PileupReweightingTool:");
     for( unsigned int i=0; i < lumiCalcFiles.size(); ++i){
       //      lumiCalcFiles.at(i) = gSystem->ExpandPathName(lumiCalcFiles.at(i).c_str());
       printf( "\t %s \n", lumiCalcFiles.at(i).c_str() );
     }
 
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileuptool->setProperty("ConfigFiles", PRWFiles), "");
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileuptool->setProperty("LumiCalcFiles", lumiCalcFiles), "");
+    RETURN_CHECK("BasicEventSelection::initialize()", checkToolStore<CP::PileupReweightingTool>("Pileup"), "" );
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.makeNew<CP::PileupReweightingTool>("CP::PileupReweightingTool/Pileup"), "Failed to create handle to CP::PileupReweightingTool");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("ConfigFiles", PRWFiles), "");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("LumiCalcFiles", lumiCalcFiles), "");
     if ( m_PU_default_channel ) {
-      RETURN_CHECK("BasicEventSelection::initialize()", m_pileuptool->setProperty("DefaultChannel", m_PU_default_channel), "");
+      RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DefaultChannel", m_PU_default_channel), "");
     }
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileuptool->initialize(), "Failed to properly initialize CP::PileupReweightingTool");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactor", 1.0/1.16), "Failed to set pileup reweighting data scale factor");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorUP", 1.0), "Failed to set pileup reweighting data scale factor up");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorDOWN", 1.0/1.23), "Failed to set pileup reweighting data scale factor down");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.initialize(), "Failed to properly initialize CP::PileupReweightingTool");
+    //m_pileup_tool_handle->EnableDebugging(true);
+
   }
 
   // 3.
@@ -611,18 +515,30 @@ EL::StatusCode BasicEventSelection :: initialize ()
 
   if( !m_triggerSelection.empty() || m_applyTriggerCut || m_storeTrigDecisions || m_storePassL1 || m_storePassHLT || m_storeTrigKeys ) {
 
-    m_trigConfTool = new TrigConf::xAODConfigTool( "xAODConfigTool" );
-    RETURN_CHECK("BasicEventSelection::initialize()", m_trigConfTool->initialize(), "Failed to properly initialize TrigConf::xAODConfigTool");
-    ToolHandle< TrigConf::ITrigConfigTool > configHandle( m_trigConfTool );
+    //if it's there, it must be already configured
+    if ( asg::ToolStore::contains<Trig::TrigDecisionTool>( "TrigDecisionTool" ) && asg::ToolStore::contains<TrigConf::xAODConfigTool>("xAODConfigTool")) {
 
-    m_trigDecTool = new Trig::TrigDecisionTool( "TrigDecisionTool" );
-    RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->setProperty( "ConfigTool", configHandle ), "");
-    RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->setProperty( "TrigDecisionKey", "xTrigDecision" ), "");
-    RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->setProperty( "OutputLevel", MSG::ERROR), "");
-    RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->initialize(), "Failed to properly initialize Trig::TrigDecisionTool");
-    Info("initialize()", "Successfully configured Trig::TrigDecisionTool!");
+      m_trigDecTool = asg::ToolStore::get<Trig::TrigDecisionTool>("TrigDecisionTool");
+      m_trigConfTool = asg::ToolStore::get<TrigConf::xAODConfigTool>("xAODConfigTool");
 
-  }
+    }
+
+    else {
+
+      m_trigConfTool = new TrigConf::xAODConfigTool( "xAODConfigTool" );
+      RETURN_CHECK("BasicEventSelection::initialize()", m_trigConfTool->initialize(), "Failed to properly initialize TrigConf::xAODConfigTool");
+      ToolHandle< TrigConf::ITrigConfigTool > configHandle( m_trigConfTool );
+
+      m_trigDecTool = new Trig::TrigDecisionTool( "TrigDecisionTool" );
+      RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->setProperty( "ConfigTool", configHandle ), "");
+      RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->setProperty( "TrigDecisionKey", "xTrigDecision" ), "");
+      RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->setProperty( "OutputLevel", MSG::ERROR), "");
+      RETURN_CHECK("BasicEventSelection::initialize()", m_trigDecTool->initialize(), "Failed to properly initialize Trig::TrigDecisionTool");
+      Info("initialize()", "Successfully configured Trig::TrigDecisionTool!");
+
+    }
+
+  }//end trigger configuration
 
   // As a check, let's see the number of events in our file (long long int)
   //
@@ -683,45 +599,59 @@ EL::StatusCode BasicEventSelection :: execute ()
   }
 
   //------------------------------------------------------------------------------------------
+  // Update Pile-Up Reweighting
+  //------------------------------------------------------------------------------------------
+  if ( m_isMC && m_doPUreweighting ) {
+      m_pileup_tool_handle->apply( *eventInfo ); // NB: this call automatically decorates eventInfo with:
+                                                 //  1.) the PU weight ("PileupWeight")
+                                                 //  2.) the corrected mu ("corrected_averageInteractionsPerCrossing")
+                                                 //  3.) the random run number ("RandomRunNumber")
+                                                 //  4.) the random lumiblock number ("RandomLumiBlockNumber")
+  }
+
+  //------------------------------------------------------------------------------------------
   // Declare an 'eventInfo' decorator with the *total* MC event weight
   // This will be the product of all the weights, SFs applied to MC downstream from this algo!
   //------------------------------------------------------------------------------------------
   static SG::AuxElement::Decorator< float > mcEvtWeightDecor("mcEventWeight");
+  static SG::AuxElement::Accessor< float >  mcEvtWeightAcc("mcEventWeight");
 
   float mcEvtWeight(1.0);
-  //float pileupWeight(1.0);
 
-  if ( m_isMC ) {
-    const std::vector< float > weights = eventInfo->mcEventWeights(); // The weight (and systs) of all the MC events used in the simulation
-    if ( weights.size() > 0 ) mcEvtWeight = weights[0];
+  // Check if need to create xAH event weight
+  if(!mcEvtWeightDecor.isAvailable(*eventInfo)) {
+    if ( m_isMC ) {
+      const std::vector< float > weights = eventInfo->mcEventWeights(); // The weight (and systs) of all the MC events used in the simulation
+      if ( weights.size() > 0 ) mcEvtWeight = weights[0];
 
-    //for ( auto& it : weights ) { Info("execute()", "event weight: %2f.", it ); }
+      //for ( auto& it : weights ) { Info("execute()", "event weight: %2f.", it ); }
 
-    // kill the powheg event with a huge weight
-    if( m_cleanPowheg ) {
-      if( eventInfo->eventNumber() == 1652845 ) {
-        Info("execute()","Dropping huge weight event. Weight should be 352220000");
-        Info("execute()","WEIGHT : %f ", mcEvtWeight);
-        wk()->skipEvent();
-        return EL::StatusCode::SUCCESS; // go to next event
+      // kill the powheg event with a huge weight
+      if( m_cleanPowheg ) {
+	if( eventInfo->eventNumber() == 1652845 ) {
+	  Info("execute()","Dropping huge weight event. Weight should be 352220000");
+	  Info("execute()","WEIGHT : %f ", mcEvtWeight);
+	  wk()->skipEvent();
+	  return EL::StatusCode::SUCCESS; // go to next event
+	}
       }
     }
-
-    if ( m_doPUreweighting ) {
-      m_pileuptool->apply( *eventInfo ); // NB: this call automatically decorates eventInfo with:
-                                         //  1.) the PU weight ("PileupWeight")
-                                         //  2.) the corrected mu ("corrected_averageInteractionsPerCrossing")
-                                         //  3.) the random run number ("RandomRunNumber")
-                                         //  4.) the random lumiblock number ("RandomLumiBlockNumber")
-
-      //pileupWeight = m_pileuptool->getCombinedWeight(*eventInfo) ;
-      //mcEvtWeight *= pileupWeight;
-    }
+    // Decorate event with the *total* MC event weight
+    //
+    mcEvtWeightDecor(*eventInfo) = mcEvtWeight;
+  } else {
+    mcEvtWeight=mcEvtWeightAcc(*eventInfo);
   }
 
-  // Decorate event with the *total* MC event weight
-  //
-  mcEvtWeightDecor(*eventInfo) = mcEvtWeight;
+  if( !m_useMetaData )
+    {
+      m_histEventCount -> Fill(1, 1);
+      m_histEventCount -> Fill(2, 1);
+      m_histEventCount -> Fill(3, mcEvtWeight);
+      m_histEventCount -> Fill(4, mcEvtWeight);
+      m_histEventCount -> Fill(5, mcEvtWeight*mcEvtWeight);
+      m_histEventCount -> Fill(6, mcEvtWeight*mcEvtWeight);
+    }
 
   // print every 1000 events, so we know where we are:
   //
@@ -908,10 +838,9 @@ EL::StatusCode BasicEventSelection :: finalize ()
 
   m_RunNr_VS_EvtNr.clear();
 
-  if ( m_grl )          {  m_grl = nullptr;	     delete m_grl; }
-  if ( m_pileuptool )   {  m_pileuptool = nullptr;   delete m_pileuptool; }
-  if ( m_trigDecTool )  {  m_trigDecTool = nullptr;  delete m_trigDecTool; }
-  if ( m_trigConfTool ) {  m_trigConfTool = nullptr; delete m_trigConfTool; }
+  if ( m_grl )          { delete m_grl; m_grl = nullptr; }
+  if ( m_trigDecTool )  { delete m_trigDecTool;  m_trigDecTool = nullptr; }
+  if ( m_trigConfTool ) { delete m_trigConfTool;  m_trigConfTool = nullptr; }
 
   return EL::StatusCode::SUCCESS;
 }

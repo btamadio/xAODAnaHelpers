@@ -15,9 +15,6 @@
 #include <xAODAnaHelpers/HelperClasses.h>
 #include <xAODAnaHelpers/tools/ReturnCheck.h>
 
-#include "TEnv.h"
-#include "TSystem.h"
-
 // this is needed to distribute the algorithm to the workers
 ClassImp(TreeAlgo)
 
@@ -29,7 +26,8 @@ TreeAlgo :: TreeAlgo (std::string className) :
   m_weight_xs = 1;
   m_evtDetailStr            = "";
   m_trigDetailStr           = "";
-  m_jetTrigDetailStr        = "";
+  m_trigJetDetailStr        = "";
+  m_truthJetDetailStr       = "";
   m_muDetailStr             = "";
   m_elDetailStr             = "";
   m_jetDetailStr            = "";
@@ -54,6 +52,10 @@ TreeAlgo :: TreeAlgo (std::string className) :
   // DC14 switch for little things that need to happen to run
   // for those samples with the corresponding packages
   m_DC14                    = false;
+
+  //Units, defaulting to GeV
+  m_units                   = 1e3;
+
 
 }
 
@@ -82,7 +84,6 @@ EL::StatusCode TreeAlgo :: treeInitialize ()
 {
   Info("treeInitialize()", "%s", m_name.c_str() );
   // needed here and not in initalize since this is called first
-  Info("treeInitialize()", "Attempting to configure using: %s", getConfig().c_str());
 
   TTree * outTree = new TTree(m_name.c_str(),m_name.c_str());
   if ( !outTree ) {
@@ -90,17 +91,10 @@ EL::StatusCode TreeAlgo :: treeInitialize ()
     return EL::StatusCode::FAILURE;
   }
 
-  // get the input from user which determines which branches are created!
-  if ( this->configure() != EL::StatusCode::SUCCESS ) {
-    Error("treeInitialize()", "%s failed to properly configure. Exiting.", m_name.c_str() );
-    return EL::StatusCode::FAILURE;
-  } else {
-    Info("treeInitialize()", "Succesfully configured! ");
-  }
-
   // get the file we created already
   TFile* treeFile = wk()->getOutputFile ("tree");
-  m_helpTree = new HelpTreeBase( m_event, outTree, treeFile, 1e3, m_debug, m_DC14 );
+
+  m_helpTree = new HelpTreeBase( m_event, outTree, treeFile, m_units, m_debug, m_DC14 );
 
   // tell the tree to go into the file
   outTree->SetDirectory( treeFile );
@@ -112,10 +106,11 @@ EL::StatusCode TreeAlgo :: treeInitialize ()
   m_helpTree->AddEvent( m_evtDetailStr );
 
   if ( !m_trigDetailStr.empty() )       {   m_helpTree->AddTrigger    (m_trigDetailStr);    }
-  if ( !m_jetTrigDetailStr.empty() )    {   m_helpTree->AddJetTrigger (m_jetTrigDetailStr); }
   if ( !m_muContainerName.empty() )     {   m_helpTree->AddMuons      (m_muDetailStr);      }
   if ( !m_elContainerName.empty() )     {   m_helpTree->AddElectrons  (m_elDetailStr);      }
-  if ( !m_jetContainerName.empty() )    {   m_helpTree->AddJets       (m_jetDetailStr);     }
+  if ( !m_jetContainerName.empty() )    {   m_helpTree->AddJets       (m_jetDetailStr, "jet");     }
+  if ( !m_trigJetContainerName.empty() ){   m_helpTree->AddJets       (m_trigJetDetailStr, "trigJet");     }
+  if ( !m_truthJetContainerName.empty() ){   m_helpTree->AddJets       (m_truthJetDetailStr, "truthJet");     }
   if ( !m_fatJetContainerName.empty() ) {   m_helpTree->AddFatJets    (m_fatJetDetailStr);  }
   if ( !m_tauContainerName.empty() )    {   m_helpTree->AddTaus       (m_tauDetailStr);     }
   if ( !m_METContainerName.empty() )    {   m_helpTree->AddMET        (m_METDetailStr);     }
@@ -126,6 +121,7 @@ EL::StatusCode TreeAlgo :: treeInitialize ()
   return EL::StatusCode::SUCCESS;
 }
 
+<<<<<<< HEAD
 EL::StatusCode TreeAlgo :: configure ()
 {
   if (!getConfig().empty()) {
@@ -171,12 +167,15 @@ EL::StatusCode TreeAlgo :: configure ()
   return EL::StatusCode::SUCCESS;
 }
 
+=======
+>>>>>>> 5214b948fbc47c9459636deca8014f55c443e079
 EL::StatusCode TreeAlgo :: fileExecute () { return EL::StatusCode::SUCCESS; }
 EL::StatusCode TreeAlgo :: changeInput (bool /*firstFile*/) { return EL::StatusCode::SUCCESS; }
 
 
 EL::StatusCode TreeAlgo :: execute ()
 {
+
   // Get EventInfo and the PrimaryVertices
   const xAOD::EventInfo* eventInfo(nullptr);
   RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(eventInfo, m_eventInfoContainerName, m_event, m_store, m_verbose) ,"");
@@ -194,10 +193,10 @@ EL::StatusCode TreeAlgo :: execute ()
     m_helpTree->FillTrigger( eventInfo );
   }
 
-  // Fill jet trigger information
-  if ( !m_jetTrigDetailStr.empty() ) {
+  // Fill jet trigger information - this can be used if with layer/cleaning info we need to turn off some variables?
+  /*if ( !m_trigJetDetailStr.empty() ) {
     m_helpTree->FillJetTrigger();
-  }
+  }*/
 
   // for the containers the were supplied, fill the appropriate vectors
   if ( !m_muContainerName.empty() ) {
@@ -214,12 +213,23 @@ EL::StatusCode TreeAlgo :: execute ()
   if ( !m_jetContainerName.empty() ) {
     const xAOD::JetContainer* inJets(nullptr);
     RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inJets, m_jetContainerName, m_event, m_store, m_verbose) ,"");
+
     if(wk()->metaData()->castDouble("no_vtx",0)==0){
       m_helpTree->FillJets( inJets, HelperFunctions::getPrimaryVertexLocation(vertices) );
     }
     else{
       m_helpTree->FillJets( inJets, 0 );
     }
+  }
+  if ( !m_trigJetContainerName.empty() ) {
+    const xAOD::JetContainer* inTrigJets(nullptr);
+    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inTrigJets, m_trigJetContainerName, m_event, m_store, m_verbose) ,"");
+    m_helpTree->FillJets( inTrigJets, HelperFunctions::getPrimaryVertexLocation(vertices), "trigJet" );
+  }
+  if ( !m_truthJetContainerName.empty() ) {
+    const xAOD::JetContainer* inTruthJets(nullptr);
+    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inTruthJets, m_truthJetContainerName, m_event, m_store, m_verbose) ,"");
+        m_helpTree->FillJets( inTruthJets, HelperFunctions::getPrimaryVertexLocation(vertices), "truthJet" );
   }
   if ( !m_fatJetContainerName.empty() ) {
     const xAOD::JetContainer* inFatJets(nullptr);

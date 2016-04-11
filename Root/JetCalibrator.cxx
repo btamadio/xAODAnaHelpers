@@ -31,10 +31,8 @@
 #include "xAODAnaHelpers/JetCalibrator.h"
 #include <xAODAnaHelpers/tools/ReturnCheck.h>
 
-// ROOT include(s):
-#include "TEnv.h"
+// ROOT includes:
 #include "TSystem.h"
-
 
 // this is needed to distribute the algorithm to the workers
 ClassImp(JetCalibrator)
@@ -101,82 +99,6 @@ JetCalibrator :: JetCalibrator (std::string className) :
   m_systName                = "";
   m_systVal                 = 0.;
 }
-
-EL::StatusCode  JetCalibrator :: configure ()
-{
-  if ( !getConfig().empty() ) {
-
-    Info("configure()", "Configuring JetCalibrator Interface. User configuration read from : %s ", getConfig().c_str());
-
-    TEnv* config = new TEnv(getConfig(true).c_str());
-
-    // read debug flag from .config file
-    m_debug                   = config->GetValue("Debug" , m_debug);
-    m_sort                    = config->GetValue("Sort",            m_sort);
-    // input container to be read from TEvent or TStore
-    m_inContainerName         = config->GetValue("InputContainer",  m_inContainerName.c_str());
-    // shallow copies are made with this output container name
-    m_outContainerName        = config->GetValue("OutputContainer", m_outContainerName.c_str());
-
-    // CONFIG parameters for JetCalibrationTool and systematic variations
-    m_jetAlgo                 = config->GetValue("JetAlgorithm",        m_jetAlgo.c_str());
-    m_outputAlgo     = config->GetValue("OutputAlgoSystNames", m_outputAlgo.c_str());
-    m_outputAlgo     = config->GetValue("OutputAlgo", m_outputAlgo.c_str()); //legacy option
-
-    // Provisional default, since "None" is assigned to this string if this default is not set here
-    m_systName                = config->GetValue("SystName",            m_systName.c_str());
-    m_systVal                 = config->GetValue("SystVal",             m_systVal);
-
-    // when running data "_Insitu" is appended to this string
-    m_calibSequence           = config->GetValue("CalibSequence",           m_calibSequence.c_str());
-    m_calibConfigFullSim      = config->GetValue("configNameFullSim",       m_calibConfigFullSim.c_str());
-    m_calibConfigAFII         = config->GetValue("configNameAFII",          m_calibConfigAFII.c_str());
-    m_calibConfigData         = config->GetValue("configNameData",          m_calibConfigData.c_str());
-
-    // CONFIG parameters for JetUncertaintiesTool
-    m_JESUncertConfig         = config->GetValue("JESUncertConfig", m_JESUncertConfig.c_str());
-    m_JESUncertMCType         = config->GetValue("JESUncertMCType", m_JESUncertMCType.c_str());
-    m_setAFII                 = config->GetValue("SetAFII",  m_setAFII);
-
-    // CONFIG parameters for JERSmearingTool
-    m_JERUncertConfig         = config->GetValue("JERUncertConfig", m_JERUncertConfig.c_str());
-    m_JERFullSys              = config->GetValue("JERFullSys",      m_JERFullSys);
-    m_JERApplyNominal         = config->GetValue("JERApplyNominal", m_JERApplyNominal);
-
-    m_doCleaning              = config->GetValue("DoCleaning", m_doCleaning);
-    // CONFIG parameters for JetCleaningTool
-    m_jetCleanCutLevel        = config->GetValue("JetCleanCutLevel",        m_jetCleanCutLevel.c_str());
-    m_jetCleanUgly            = config->GetValue("JetCleanUgly",            m_jetCleanUgly );
-    m_saveAllCleanDecisions   = config->GetValue("SaveAllCleanDecisions",   m_saveAllCleanDecisions);
-    m_cleanParent             = config->GetValue("CleanParent",             m_cleanParent);
-    m_applyFatJetPreSel       = config->GetValue("ApplyFatJetPreSel",       m_applyFatJetPreSel);
-
-    m_redoJVT                 = config->GetValue("RedoJVT",         m_redoJVT);
-
-    config->Print();
-
-    delete config; config = nullptr;
-  }
-
-  // If there is no InputContainer we must stop
-  if ( m_inContainerName.empty() ) {
-    Error("configure()", "InputContainer is empty!");
-    return EL::StatusCode::FAILURE;
-  }
-
-  if ( m_outputAlgo.empty() ) {
-    m_outputAlgo = m_jetAlgo + "_Calib_Algo";
-  }
-
-  m_outSCContainerName      = m_outContainerName + "ShallowCopy";
-  m_outSCAuxContainerName   = m_outSCContainerName + "Aux."; // the period is very important!
-
-  if ( !getConfig().empty() )
-    Info("configure()", "JetCalibrator Interface succesfully configured! ");
-
-  return EL::StatusCode::SUCCESS;
-}
-
 
 EL::StatusCode JetCalibrator :: setupJob (EL::Job& job)
 {
@@ -253,9 +175,14 @@ EL::StatusCode JetCalibrator :: initialize ()
 
   Info("initialize()", "Number of events in file: %lld ", m_event->getEntries() );
 
-  if ( this->configure() == EL::StatusCode::FAILURE ) {
-    Error("initialize()", "Failed to properly configure. Exiting." );
+  // If there is no InputContainer we must stop
+  if ( m_inContainerName.empty() ) {
+    Error("initialize()", "InputContainer is empty!");
     return EL::StatusCode::FAILURE;
+  }
+
+  if ( m_outputAlgo.empty() ) {
+    m_outputAlgo = m_jetAlgo + "_Calib_Algo";
   }
 
   m_numEvent      = 0;
@@ -500,6 +427,27 @@ EL::StatusCode JetCalibrator :: execute ()
   const xAOD::JetContainer* inJets(nullptr);
   RETURN_CHECK("JetCalibrator::execute()", HelperFunctions::retrieve(inJets, m_inContainerName, m_event, m_store, m_verbose) ,"");
 
+  //
+  // Perform nominal calibration
+  std::pair< xAOD::JetContainer*, xAOD::ShallowAuxContainer* > calibJetsSC = xAOD::shallowCopyContainer( *inJets );
+  ConstDataVector<xAOD::JetContainer>* calibJetsCDV = new ConstDataVector<xAOD::JetContainer>(SG::VIEW_ELEMENTS);
+  calibJetsCDV->reserve( calibJetsSC.first->size() );
+
+  std::string outSCContainerName=m_outContainerName+"ShallowCopy";
+  std::string outSCAuxContainerName=m_outContainerName+"ShallowCopyAux.";
+  RETURN_CHECK( "JetCalibrator::execute()", m_store->record( calibJetsSC.first,  outSCContainerName),    "Failed to record shallow copy container.");
+  RETURN_CHECK( "JetCalibrator::execute()", m_store->record( calibJetsSC.second, outSCAuxContainerName), "Failed to record shallow copy aux container.");
+
+  for ( auto jet_itr : *(calibJetsSC.first) ) {
+    m_numObject++;
+
+    if ( m_jetCalibration->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
+      Error("execute()", "JetCalibration tool reported a CP::CorrectionCode::Error");
+      Error("execute()", "%s", m_name.c_str());
+      return StatusCode::FAILURE;
+    }
+  }//for jets
+
   // loop over available systematics - remember syst == "Nominal" --> baseline
   std::vector< std::string >* vecOutContainerNames = new std::vector< std::string >;
 
@@ -508,31 +456,17 @@ EL::StatusCode JetCalibrator :: execute ()
     unsigned int sysIndex = (&syst_it - &m_systList[0]);
     int thisSysType = m_systType.at(sysIndex);
 
-    std::string outSCContainerName(m_outSCContainerName);
-    std::string outSCAuxContainerName(m_outSCAuxContainerName);
-    std::string outContainerName(m_outContainerName);
-
     // always append the name of the variation, including nominal which is an empty string
-    outSCContainerName    += syst_it.name();
-    outSCAuxContainerName += syst_it.name();
-    outContainerName      += syst_it.name();
+    outSCContainerName   =m_outContainerName+syst_it.name()+"ShallowCopy";
+    outSCAuxContainerName=m_outContainerName+syst_it.name()+"ShallowCopyAux.";
+    std::string outContainerName=m_outContainerName+syst_it.name();
+
     vecOutContainerNames->push_back( syst_it.name() );
 
     // create shallow copy;
-    std::pair< xAOD::JetContainer*, xAOD::ShallowAuxContainer* > calibJetsSC = xAOD::shallowCopyContainer( *inJets );
-    ConstDataVector<xAOD::JetContainer>* calibJetsCDV = new ConstDataVector<xAOD::JetContainer>(SG::VIEW_ELEMENTS);
-    calibJetsCDV->reserve( calibJetsSC.first->size() );
-
-    // Nominal calibration for all inputs
-    for ( auto jet_itr : *(calibJetsSC.first) ) {
-      m_numObject++;
-
-      if ( m_jetCalibration->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
-        Error("execute()", "JetCalibration tool reported a CP::CorrectionCode::Error");
-        Error("execute()", "%s", m_name.c_str());
-        return StatusCode::FAILURE;
-      }
-    }//for jets
+    std::pair< xAOD::JetContainer*, xAOD::ShallowAuxContainer* > uncertCalibJetsSC = (thisSysType==0)? calibJetsSC : xAOD::shallowCopyContainer( *calibJetsSC.first );
+    ConstDataVector<xAOD::JetContainer>* uncertCalibJetsCDV = new ConstDataVector<xAOD::JetContainer>(SG::VIEW_ELEMENTS);
+    uncertCalibJetsCDV->reserve( uncertCalibJetsSC.first->size() );
 
     //Apply Uncertainties
     if ( m_runSysts ) {
@@ -544,9 +478,7 @@ EL::StatusCode JetCalibrator :: execute ()
           return EL::StatusCode::FAILURE;
         }
 
-	for ( auto jet_itr : *(calibJetsSC.first) ) {
-          if ( m_runSysts ) {
-
+	for ( auto jet_itr : *(uncertCalibJetsSC.first) ) {
 	    if (m_applyFatJetPreSel) {
 	      bool validForJES = (jet_itr->pt() >= 150e3 && jet_itr->pt() < 3000e3);
 	      validForJES &= (jet_itr->m()/jet_itr->pt() >= 0 && jet_itr->m()/jet_itr->pt() < 1);
@@ -557,7 +489,6 @@ EL::StatusCode JetCalibrator :: execute ()
             if ( m_JESUncertTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
               Error("execute()", "JetUncertaintiesTool reported a CP::CorrectionCode::Error");
               Error("execute()", "%s", m_name.c_str());
-            }
           }
         }//for jets
       }//JES
@@ -576,7 +507,7 @@ EL::StatusCode JetCalibrator :: execute ()
           }
         }
         // JER Uncertainty Systematic
-        for ( auto jet_itr : *(calibJetsSC.first) ) {
+        for ( auto jet_itr : *(uncertCalibJetsSC.first) ) {
           if ( m_JERSmearTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
             Error("execute()", "JERSmearTool tool reported a CP::CorrectionCode::Error");
             Error("execute()", "%s", m_name.c_str());
@@ -588,7 +519,7 @@ EL::StatusCode JetCalibrator :: execute ()
 
     if(m_doCleaning){
       // decorate with cleaning decision
-      for ( auto jet_itr : *(calibJetsSC.first) ) {
+      for ( auto jet_itr : *(uncertCalibJetsSC.first) ) {
 
         static SG::AuxElement::Decorator< char > isCleanDecor( "cleanJet" );
         const xAOD::Jet* jetToClean = jet_itr;
@@ -613,33 +544,35 @@ EL::StatusCode JetCalibrator :: execute ()
       } //end cleaning decision
     }
 
-    if ( !xAOD::setOriginalObjectLink(*inJets, *(calibJetsSC.first)) ) {
+    if ( !xAOD::setOriginalObjectLink(*inJets, *(uncertCalibJetsSC.first)) ) {
       Error("execute()  ", "Failed to set original object links -- MET rebuilding cannot proceed.");
     }
 
     // Recalculate JVT using calibrated Jets
     if(m_redoJVT){
-      for ( auto jet_itr : *(calibJetsSC.first) ) {
+      for ( auto jet_itr : *(uncertCalibJetsSC.first) ) {
         jet_itr->auxdata< float >("Jvt") = m_JVTToolHandle->updateJvt(*jet_itr);
       }
     }
 
     // save pointers in ConstDataVector with same order
-    for ( auto jet_itr : *(calibJetsSC.first) ) {
-      calibJetsCDV->push_back( jet_itr );
+    for ( auto jet_itr : *(uncertCalibJetsSC.first) ) {
+      uncertCalibJetsCDV->push_back( jet_itr );
     }
 
     // can only sort the CDV - a bit no-no to sort the shallow copies
     if ( m_sort ) {
-      std::sort( calibJetsCDV->begin(), calibJetsCDV->end(), HelperFunctions::sort_pt );
+      std::sort( uncertCalibJetsCDV->begin(), uncertCalibJetsCDV->end(), HelperFunctions::sort_pt );
     }
 
     // add shallow copy to TStore
-    RETURN_CHECK( "JetCalibrator::execute()", m_store->record( calibJetsSC.first, outSCContainerName), "Failed to record shallow copy container.");
-    RETURN_CHECK( "JetCalibrator::execute()", m_store->record( calibJetsSC.second, outSCAuxContainerName), "Failed to record shallow copy aux container.");
+    if(thisSysType!=0) { // nominal is always saved outside of loop
+      RETURN_CHECK( "JetCalibrator::execute()", m_store->record( uncertCalibJetsSC.first, outSCContainerName), "Failed to record shallow copy container.");
+      RETURN_CHECK( "JetCalibrator::execute()", m_store->record( uncertCalibJetsSC.second, outSCAuxContainerName), "Failed to record shallow copy aux container.");
+    }
 
     // add ConstDataVector to TStore
-    RETURN_CHECK( "JetCalibrator::execute()", m_store->record( calibJetsCDV, outContainerName), "Failed to record const data container.");
+    RETURN_CHECK( "JetCalibrator::execute()", m_store->record( uncertCalibJetsCDV, outContainerName), "Failed to record const data container.");
   }
   // add vector of systematic names to TStore
   RETURN_CHECK( "JetCalibrator::execute()", m_store->record( vecOutContainerNames, m_outputAlgo), "Failed to record vector of output container names.");

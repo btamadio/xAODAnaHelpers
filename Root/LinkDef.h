@@ -19,6 +19,7 @@
 #include <xAODAnaHelpers/MuonCalibrator.h>
 /*#include <xAODAnaHelpers/GroomedFatJets.h>*/
 #include <xAODAnaHelpers/HLTJetRoIBuilder.h>
+#include <xAODAnaHelpers/HLTJetGetter.h>
 
 /* Missing Energy Reconstruction */
 #include <xAODAnaHelpers/METConstructor.h>
@@ -29,10 +30,13 @@
 #include <xAODAnaHelpers/BJetEfficiencyCorrector.h>
 
 /* Plotting Tools */
+#include <xAODAnaHelpers/IParticleHistsAlgo.h>
 #include <xAODAnaHelpers/JetHistsAlgo.h>
 #include <xAODAnaHelpers/MuonHistsAlgo.h>
+#include <xAODAnaHelpers/PhotonHistsAlgo.h>
 #include <xAODAnaHelpers/MetHistsAlgo.h>
 #include <xAODAnaHelpers/TrackHistsAlgo.h>
+#include <xAODAnaHelpers/ClusterHistsAlgo.h>
 
 /* Tree */
 #include <xAODAnaHelpers/TreeAlgo.h>
@@ -68,6 +72,7 @@
 #pragma link C++ class JetCalibrator+;
 #pragma link C++ class HLTJetRoIBuilder+;
 #pragma link C++ class MuonCalibrator+;
+#pragma link C++ class HLTJetGetter+;
 /*#pragma link C++ class GroomedFatJets+;*/
 
 #pragma link C++ class METConstructor+;
@@ -76,10 +81,13 @@
 #pragma link C++ class MuonEfficiencyCorrector+;
 #pragma link C++ class BJetEfficiencyCorrector+;
 
+#pragma link C++ class IParticleHistsAlgo+;
 #pragma link C++ class JetHistsAlgo+;
 #pragma link C++ class MuonHistsAlgo+;
+#pragma link C++ class PhotonHistsAlgo+;
 #pragma link C++ class MetHistsAlgo+;
 #pragma link C++ class TrackHistsAlgo+;
+#pragma link C++ class ClusterHistsAlgo+;
 
 #pragma link C++ class TreeAlgo+;
 

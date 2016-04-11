@@ -29,9 +29,7 @@
 #include "PATCore/TAccept.h"
 
 // ROOT include(s):
-#include "TEnv.h"
 #include "TFile.h"
-#include "TSystem.h"
 #include "TObjArray.h"
 #include "TObjString.h"
 
@@ -96,58 +94,12 @@ TauSelector :: TauSelector (std::string className) :
   m_EleOLRFilePath          = "";
 
   m_minPtDAOD               = 15e3;
+
+  m_setTauOverlappingEleLLHDecor = true;
+
 }
 
 TauSelector::~TauSelector() {}
-
-EL::StatusCode  TauSelector :: configure ()
-{
-
-  if ( !getConfig().empty() ) {
-
-    Info("configure()", "Configuing TauSelector Interface. User configuration read from : %s ", m_configName.c_str());
-
-    TEnv* config = new TEnv(getConfig(true).c_str());
-
-    m_debug                   = config->GetValue("Debug" ,      m_debug);
-    m_useCutFlow              = config->GetValue("UseCutFlow",  m_useCutFlow);
-
-    m_inContainerName         = config->GetValue("InputContainer",  m_inContainerName.c_str());
-
-    m_inputAlgoSystNames      = config->GetValue("InputAlgoSystNames",  m_inputAlgoSystNames.c_str());
-    m_outputAlgoSystNames     = config->GetValue("OutputAlgoSystNames", m_outputAlgoSystNames.c_str());
-
-    m_decorateSelectedObjects = config->GetValue("DecorateSelectedObjects", m_decorateSelectedObjects);
-    m_createSelectedContainer = config->GetValue("CreateSelectedContainer", m_createSelectedContainer);
-    m_outContainerName        = config->GetValue("OutputContainer", m_outContainerName.c_str());
-
-    m_nToProcess              = config->GetValue("NToProcess", m_nToProcess);
-
-    m_pass_max                = config->GetValue("PassMax", m_pass_max);
-    m_pass_min                = config->GetValue("PassMin", m_pass_min);
-
-    m_ConfigPath              = config->GetValue("ConfigPath", m_ConfigPath.c_str());
-    m_EleOLRFilePath          = config->GetValue("EleOLRFilePath", m_EleOLRFilePath.c_str());
-
-    m_minPtDAOD               = config->GetValue("MinPtDAOD", m_minPtDAOD);
-
-    config->Print();
-
-    Info("configure()", "TauSelector Interface succesfully configured! ");
-
-    delete config; config = nullptr;
-  }
-
-  m_outAuxContainerName     = m_outContainerName + "Aux."; // the period is very important!
-
-  if ( m_inContainerName.empty() ){
-    Error("configure()", "InputContainer is empty!");
-    return EL::StatusCode::FAILURE;
-  }
-
-  return EL::StatusCode::SUCCESS;
-}
-
 
 EL::StatusCode TauSelector :: setupJob (EL::Job& job)
 {
@@ -267,8 +219,11 @@ EL::StatusCode TauSelector :: initialize ()
 
   Info("initialize()", "Number of events in file: %lld ", m_event->getEntries() );
 
-  if ( configure() == EL::StatusCode::FAILURE ) {
-    Error("initialize()", "Failed to properly configure. Exiting." );
+
+  m_outAuxContainerName     = m_outContainerName + "Aux."; // the period is very important!
+
+  if ( m_inContainerName.empty() ){
+    Error("initialize()", "InputContainer is empty!");
     return EL::StatusCode::FAILURE;
   }
 
@@ -294,10 +249,12 @@ EL::StatusCode TauSelector :: initialize ()
   }
   RETURN_CHECK("TauSelector::initialize()", m_TauSelTool->initialize(), "Failed to properly initialize TauSelectionTool");
 
-  std::string eleOLR_tool_name = std::string("TauOverlappingElectronLLHDecorator_") + m_name;
-  m_TOELLHDecorator = new TauAnalysisTools::TauOverlappingElectronLLHDecorator( eleOLR_tool_name );
-  m_TOELLHDecorator->msg().setLevel( MSG::INFO); // VERBOSE, INFO, DEBUG
-  RETURN_CHECK("TauSelector::initialize()", m_TOELLHDecorator->initialize(), "Failed to properly initialize TauOverlappingElectronLLHDecorator");
+  if ( m_setTauOverlappingEleLLHDecor ) {
+    std::string eleOLR_tool_name = std::string("TauOverlappingElectronLLHDecorator_") + m_name;
+    m_TOELLHDecorator = new TauAnalysisTools::TauOverlappingElectronLLHDecorator( eleOLR_tool_name );
+    m_TOELLHDecorator->msg().setLevel( MSG::INFO ); // VERBOSE, INFO, DEBUG
+    RETURN_CHECK("TauSelector::initialize()", m_TOELLHDecorator->initialize(), "Failed to properly initialize TauOverlappingElectronLLHDecorator");
+  }
 
   Info("initialize()", "TauSelector Interface succesfully initialized!" );
 
@@ -585,7 +542,7 @@ int TauSelector :: passCuts( const xAOD::TauJet* tau ) {
     return 0;
   }
 
-  m_TOELLHDecorator->decorate( *tau );
+  if ( m_setTauOverlappingEleLLHDecor ) { m_TOELLHDecorator->decorate( *tau ); }
 
   if ( ! m_TauSelTool->accept( *tau ) ) {
     if ( m_debug ) { Info("PassCuts()", "Tau failed requirements of TauSelectionTool"); }

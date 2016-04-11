@@ -21,11 +21,11 @@ public:
   // configuration variables
   std::string m_inContainerName;      // input container name
   std::string m_outContainerName;     // output container name
-  bool m_decorateSelectedObjects; // decorate selected objects? defaul passSel
-  bool m_createSelectedContainer; // fill using SG::VIEW_ELEMENTS to be light weight
-  int  m_nToProcess;               // look at n objects
-  int m_pass_min;                 // minimum number of objects passing cuts
-  int m_pass_max;                 // maximum number of objects passing cuts
+  bool  m_decorateSelectedObjects; // decorate selected objects? defaul passSel
+  bool  m_createSelectedContainer; // fill using SG::VIEW_ELEMENTS to be light weight
+  int   m_nToProcess;               // look at n objects
+  int   m_pass_min;                 // minimum number of objects passing cuts
+  int   m_pass_max;                 // maximum number of objects passing cuts
   float m_pT_max;                 // require pT < pt_max
   float m_pT_min;                 // require pT > pt_max
   float m_eta_max;                // require eta < eta_max
@@ -41,6 +41,9 @@ public:
 
   std::string              m_passAuxDecorKeys;
   std::string              m_failAuxDecorKeys;
+
+  bool m_doTracksInJets; // do track selection on track within jets
+  std::string m_inJetContainerName;      // input jet container name
 
 private:
 
@@ -76,12 +79,11 @@ public:
   virtual EL::StatusCode changeInput (bool firstFile);
   virtual EL::StatusCode initialize ();
   virtual EL::StatusCode execute ();
+  EL::StatusCode executeTrackCollection ();
+  EL::StatusCode executeTracksInJets ();
   virtual EL::StatusCode postExecute ();
   virtual EL::StatusCode finalize ();
   virtual EL::StatusCode histFinalize ();
-
-  // these are the functions not inherited from Algorithm
-  virtual EL::StatusCode configure ();
 
   // added functions not from Algorithm
   // why does this need to be virtual?

@@ -20,10 +20,11 @@ public:
   double m_weight_xs;
   std::string m_evtDetailStr;
   std::string m_trigDetailStr;
-  std::string m_jetTrigDetailStr;
+  std::string m_trigJetDetailStr;
   std::string m_muDetailStr;
   std::string m_elDetailStr;
   std::string m_jetDetailStr;
+  std::string m_truthJetDetailStr;
   std::string m_fatJetDetailStr;
   std::string m_tauDetailStr;
   std::string m_METDetailStr;
@@ -33,15 +34,19 @@ public:
   std::string m_muContainerName;
   std::string m_elContainerName;
   std::string m_jetContainerName;
+
   std::string m_untrimmedFatJetContainerName;
+  std::string m_truthJetContainerName;
+  std::string m_trigJetContainerName;
   std::string m_fatJetContainerName;
   std::string m_tauContainerName;
   std::string m_METContainerName;
   std::string m_photonContainerName;
 
   bool m_DC14;
+  float m_units;
 
-private:
+protected:
   HelpTreeBase* m_helpTree;            //!
 
 public:
@@ -59,9 +64,6 @@ public:
   virtual EL::StatusCode postExecute ();                    //!
   virtual EL::StatusCode finalize ();                       //!
   virtual EL::StatusCode treeFinalize ();                   //!
-
-  // these are the functions not inherited from Algorithm
-  virtual EL::StatusCode configure ();                      //!
 
   /// @cond
   // this is needed to distribute the algorithm to the workers
