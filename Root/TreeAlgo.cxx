@@ -44,7 +44,7 @@ TreeAlgo :: TreeAlgo (std::string className) :
   m_elContainerName         = "";
   m_jetContainerName        = "";
   m_fatJetContainerName     = "";
-  m_untrimmedFatJetContainerName = "";
+  //  m_untrimmedFatJetContainerName = "";
   m_tauContainerName        = "";
   m_METContainerName        = "";
   m_photonContainerName     = "";
@@ -183,10 +183,10 @@ EL::StatusCode TreeAlgo :: execute ()
   }
   if ( !m_fatJetContainerName.empty() ) {
     const xAOD::JetContainer* inFatJets(nullptr);
-    const xAOD::JetContainer* untrimmedFatJets(nullptr);
+    //    const xAOD::JetContainer* untrimmedFatJets(nullptr);
     RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inFatJets, m_fatJetContainerName, m_event, m_store, m_verbose) ,"");
-    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(untrimmedFatJets, m_untrimmedFatJetContainerName, m_event, m_store, m_verbose) ,"");
-    m_helpTree->FillFatJets( inFatJets, untrimmedFatJets);
+    //    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(untrimmedFatJets, m_untrimmedFatJetContainerName, m_event, m_store, m_verbose) ,"");
+    m_helpTree->FillFatJets( inFatJets );
   }
   if ( !m_tauContainerName.empty() ) {
     const xAOD::TauJetContainer* inTaus(nullptr);

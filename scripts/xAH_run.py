@@ -39,7 +39,20 @@ def getInfoFromAMI(ds):
   dsid=str(d['datasetNumber'])
   return (dsid,xsec*filtEff)
 pointdictTT={
-1150:0.00001174
+950:4.362E-05,
+1000:3.078E-05,
+1050:2.254E-05,
+1100:1.614E-05,
+1150:1.174E-05,
+1200:8.726E-06,
+1250:6.479E-06,
+1300:4.826E-06,
+1350:3.63E-06,
+1400:2.743E-06,
+1450:2.079E-06,
+1500:1.585E-06,
+1550:1.213E-06,
+1600:1.213E-06-(1.585E-06-1.213E-06)
 }
 pointdictGG = {
 800:0.0014891,
@@ -47,6 +60,7 @@ pointdictGG = {
 1000:0.000325388,
 1100:0.000163491,
 1200:0.0000856418,
+1250:0.0000627027,
 1300:0.0000460525,
 1400:0.0000252977,
 1500:0.0000141903,
@@ -354,6 +368,7 @@ if __name__ == "__main__":
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
+          sampleNameList.append(sname)
           # Read settings
           fcname=os.path.dirname(fname)+'/'+sname+'.config' # replace .txt with .config
           config={}
@@ -404,16 +419,7 @@ if __name__ == "__main__":
           sampleNameList.append(fname_base)
     # print out the samples we found
     xAH_logger.info("\t%d different dataset(s) found", len(sh_all))
-<<<<<<< HEAD
-    if not args.use_scanDQ2:
-      for dataset in sh_all:
-        xAH_logger.info("\t\t%d files in %s", dataset.numFiles(), dataset.name())
-=======
-        #if not args.use_scanDQ2:
-        #for dataset in sh_all:
-        #xAH_logger.info("\t\t%d files in %s", dataset.numFiles(), dataset.name())
     sh_all.printContent()
->>>>>>> 5214b948fbc47c9459636deca8014f55c443e079
 
     if len(sh_all) == 0:
       xAH_logger.info("No datasets found. Exiting.")
@@ -450,7 +456,11 @@ if __name__ == "__main__":
         dsid = sampleName.split('.')[2]
         heavyMass = 0
         weight_xs = 1.0
-        if int(dsid) < 883000:
+        if dsid == 'fastsim' or dsid == 'fullsim' or dsid == 'Local':
+          heavyMass = 1250
+          dsid='403104'
+          weight_xs = pointdictGG[heavyMass]
+        elif int(dsid) < 883000:
           heavyMass = int(str(dsid)[3])*100+800
           weight_xs = pointdictGG[heavyMass]
         else:

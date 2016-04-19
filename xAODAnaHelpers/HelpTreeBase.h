@@ -99,7 +99,7 @@ public:
   void FillJet( const xAOD::Jet* jet_itr, const xAOD::Vertex* pv, int pvLocation, const std::string jetName = "jet" );
 
   void FillTruth( const std::string truthName, const xAOD::TruthParticleContainer* truth);
-  void FillFatJets( const xAOD::JetContainer* fatJets , const xAOD::JetContainer* untrimmedFatJets);
+  void FillFatJets( const xAOD::JetContainer* fatJets );
   void FillTaus( const xAOD::TauJetContainer* taus );
   void FillMET( const xAOD::MissingETContainer* met );
 

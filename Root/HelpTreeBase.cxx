@@ -2995,7 +2995,7 @@ void HelpTreeBase::AddFatJets(std::string detailStr) {
     m_tree->Branch("fatjet_phi", &m_fatjet_phi);
     m_tree->Branch("fatjet_eta", &m_fatjet_eta);
   }
-  if ( m_jetInfoSwitch->m_truth && m_isMC ) {
+  if ( m_fatJetInfoSwitch->m_truth && m_isMC ) {
     m_tree->Branch((jetName+"_truth_E").c_str(),   &m_fatjet_truth_E);
     m_tree->Branch((jetName+"_truth_pt").c_str(),  &m_fatjet_truth_pt);
     m_tree->Branch((jetName+"_truth_phi").c_str(), &m_fatjet_truth_phi);
@@ -3027,12 +3027,12 @@ void HelpTreeBase::AddFatJets(std::string detailStr) {
   this->AddFatJetsUser();
 }
 
-void HelpTreeBase::FillFatJets( const xAOD::JetContainer* fatJets , const xAOD::JetContainer* untrimmedFatJets) {
+void HelpTreeBase::FillFatJets( const xAOD::JetContainer* fatJets ){
   this->ClearFatJets();
   this->ClearFatJetsUser();
 
   if( m_fatJetInfoSwitch->m_truth && m_isMC){
-    for (auto untrimmedfatjet_itr : *untrimmedFatJets){
+    /*    for (auto untrimmedfatjet_itr : *untrimmedFatJets){
       const xAOD::Jet* truthFatJet = HelperFunctions::getLink<xAOD::Jet>( untrimmedfatjet_itr, "GhostTruthAssociationLink" );
       if(truthFatJet) {
 	m_fatjet_truth_pt.push_back ( truthFatJet->pt() / m_units );
@@ -3047,7 +3047,7 @@ void HelpTreeBase::FillFatJets( const xAOD::JetContainer* fatJets , const xAOD::
 	m_fatjet_truth_E.push_back  ( -999 );
 	m_fatjet_truth_m.push_back  ( -999 );
       }
-    }
+      }*/
   }
   for( auto fatjet_itr : *fatJets ) {
     if( m_fatJetInfoSwitch->m_truth && m_isMC){

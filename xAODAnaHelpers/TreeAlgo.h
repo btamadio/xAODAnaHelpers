@@ -35,7 +35,7 @@ public:
   std::string m_elContainerName;
   std::string m_jetContainerName;
 
-  std::string m_untrimmedFatJetContainerName;
+  //  std::string m_untrimmedFatJetContainerName;
   std::string m_truthJetContainerName;
   std::string m_trigJetContainerName;
   std::string m_fatJetContainerName;
