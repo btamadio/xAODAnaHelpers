@@ -87,7 +87,7 @@ public:
   TrigConf::xAODConfigTool*    m_trigConfTool;
   Trig::TrigDecisionTool*      m_trigDecTool;
 
-  void FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* event = nullptr );
+  void FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* event = nullptr,float wxs =1);
 
   void FillTrigger( const xAOD::EventInfo* eventInfo );
   void FillJetTrigger();
@@ -217,6 +217,8 @@ protected:
   int m_mcEventNumber;
   int m_mcChannelNumber;
   float m_mcEventWeight;
+  float m_weight_xs;
+  float m_weight;
   float m_weight_pileup;
   float m_correct_mu;
   int   m_rand_run_nr;
@@ -274,6 +276,7 @@ protected:
     std::vector<float> m_jet_eta;
     std::vector<float> m_jet_phi;
     std::vector<float> m_jet_E;
+    std::vector<float> m_jet_m;
 
     // rapidity
     std::vector<float> m_jet_rapidity;
@@ -544,7 +547,11 @@ protected:
 
   // substructure
   std::vector<float> m_fatjet_tau32_wta;
-
+  std::vector<float> m_fatjet_tau21_wta;
+  std::vector<float> m_fatjet_split12;
+  std::vector<float> m_fatjet_D2;
+  std::vector<float> m_fatjet_C2;
+  std::vector<int> m_fatjet_NTrimSubjets;
   // muons
   int m_nmuon;
 

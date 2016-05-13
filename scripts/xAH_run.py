@@ -91,8 +91,11 @@ parser.add_argument('--mode', dest='access_mode', type=str, metavar='{class, bra
 parser.add_argument( '--treeName', dest="treeName",     default="CollectionTree", help="Tree Name to run on")
 parser.add_argument( '--isMC',     action="store_true", dest="is_MC",    default=False, help="Running MC")
 parser.add_argument( '--isAFII',   action="store_true", dest="is_AFII",  default=False, help="Running on AFII")
-
-
+parser.add_argument( '--xsec', dest='xsec', type = float, default = None, help = 'xsec*filtEff')
+parser.add_argument( '--AMI',dest='xsecFromAMI',action='store_true',help='If enabled, will query AMI for cross section, filter efficiency, and dsid')
+parser.add_argument('--dsidFromFileName',dest='dsidFromFileName',action='store_true',help='If enabled, will pull dsid from filename')
+parser.add_argument( '--dsid', dest='dsid', type = str, default = None, help = 'DSID')
+parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
 parser.add_argument('--inputList', dest='use_inputFileList', action='store_true', help='If enabled, will read in a text file containing a list of paths/filenames.')
 parser.add_argument('--inputTag', dest='inputTag', default="", help='A wildcarded name of input files to run on.')
 parser.add_argument('--inputDQ2', dest='use_scanDQ2', action='store_true', help='If enabled, will search using DQ2. Can be combined with `--inputList`.')
@@ -313,6 +316,24 @@ if __name__ == "__main__":
               if not line.strip()     : continue
               if args.use_scanDQ2:
                 ROOT.SH.scanDQ2(sh_all, line.rstrip())
+                if args.xsecFromAMI:
+                  import pyAMI.client
+                  import pyAMI.atlas.api as AtlasAPI
+                  from pyAMI.atlas.api import get_dataset_info
+                  client = pyAMI.client.Client('atlas')
+                  AtlasAPI.init()
+                  d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
+                  filtEff=float(d['genFiltEff'])
+                  xsec=float(d['crossSection'])
+                  dsid=str(d['datasetNumber'])
+                  sh_all.setMetaString(line.rstrip(),'dsid',dsid)
+                  sh_all.setMetaDouble(line.rstrip(),'weight_xs',filtEff*xsec)
+                  print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
+                elif args.dsidFromFileName:
+                  dsid = line.rstrip().split('.')[1]
+                  print('dsid=',dsid)
+                  print('Found dataset',dsid)
+                  sh_all.setMetaString(line.rstrip(),'dsid',dsid)
               elif use_scanEOS:
                 base = os.path.basename(line)
                 ROOT.SH.ScanDir().sampleDepth(0).samplePattern(args.eosDataSet).scanEOS(sh_all,base)
@@ -384,7 +405,13 @@ if __name__ == "__main__":
     sh_all.setMetaString( "nc_tree", args.treeName)
     #sh_all.setMetaString( "nc_excludeSite", "ANALY_RAL_SL6");
     sh_all.setMetaString( "nc_grid_filter", "*");
-
+    if args.dsid:
+      sh_all.setMetaString('dsid',args.dsid)
+    if args.xsec:
+      sh_all.setMetaDouble('weight_xs',args.xsec)
+      
+    if args.no_vtx:
+      sh_all.setMetaDouble('no_vtx',1)
     # read susy meta data (should be configurable)
     xAH_logger.info("reading all metadata in $ROOTCOREBIN/data/xAODAnaHelpers/metadata")
     ROOT.SH.readSusyMetaDir(sh_all,"$ROOTCOREBIN/data/xAODAnaHelpers/metadata")
