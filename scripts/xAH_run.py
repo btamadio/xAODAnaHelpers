@@ -316,29 +316,24 @@ if __name__ == "__main__":
               if not line.strip()     : continue
               if args.use_scanDQ2:
                 ROOT.SH.scanDQ2(sh_all, line.rstrip())
-                if args.xsecFromAMI:
-                  import pyAMI.client
-                  import pyAMI.atlas.api as AtlasAPI
-                  from pyAMI.atlas.api import get_dataset_info
-                  client = pyAMI.client.Client('atlas')
-                  AtlasAPI.init()
-                  d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
-                  filtEff=float(d['genFiltEff'])
-                  xsec=float(d['crossSection'])
-                  dsid=str(d['datasetNumber'])
-                  sh_all.setMetaString(line.rstrip(),'dsid',dsid)
-                  sh_all.setMetaDouble(line.rstrip(),'weight_xs',filtEff*xsec)
-                  print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
-                elif args.dsidFromFileName:
-                  dsid = line.rstrip().split('.')[1]
-                  print('dsid=',dsid)
-                  print('Found dataset',dsid)
-                  sh_all.setMetaString(line.rstrip(),'dsid',dsid)
               elif use_scanEOS:
                 base = os.path.basename(line)
                 ROOT.SH.ScanDir().sampleDepth(0).samplePattern(args.eosDataSet).scanEOS(sh_all,base)
               else:
                 raise Exception("What just happened?")
+              if args.xsecFromAMI:
+                import pyAMI.client
+                import pyAMI.atlas.api as AtlasAPI
+                from pyAMI.atlas.api import get_dataset_info
+                client = pyAMI.client.Client('atlas')
+                AtlasAPI.init()
+                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
+                filtEff=float(d['genFiltEff'])
+                xsec=float(d['crossSection'])
+                dsid=str(d['datasetNumber'])
+                sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
+                sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
+                print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
@@ -396,7 +391,6 @@ if __name__ == "__main__":
         #for dataset in sh_all:
         #xAH_logger.info("\t\t%d files in %s", dataset.numFiles(), dataset.name())
     sh_all.printContent()
-
     if len(sh_all) == 0:
       xAH_logger.info("No datasets found. Exiting.")
       sys.exit(0)
