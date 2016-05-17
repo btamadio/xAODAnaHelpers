@@ -190,7 +190,8 @@ void HelpTreeBase::AddEvent( const std::string detailStr ) {
   this->AddEventUser();
 }
 
-void HelpTreeBase::FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* /*event*/ , float w_xs) {
+
+void HelpTreeBase::FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* /*event*/, float wxs ) {
 
   this->ClearEvent();
   this->ClearEventUser();
@@ -203,8 +204,8 @@ void HelpTreeBase::FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* /*
     m_mcEventNumber         = eventInfo->mcEventNumber();
     m_mcChannelNumber       = eventInfo->mcChannelNumber();
     m_mcEventWeight         = eventInfo->mcEventWeight();
-    m_weight_xs = w_xs;
-    m_weight = w_xs * m_mcEventWeight;
+    m_weight_xs             = wxs;
+    m_weight                = wxs*m_mcEventWeight;
   } else {
     m_bcid                  = eventInfo->bcid();
   }
@@ -1521,6 +1522,7 @@ void HelpTreeBase::AddJets(const std::string detailStr, const std::string jetNam
 
   if ( m_thisJetInfoSwitch[jetName]->m_kinematic ) {
     m_tree->Branch((jetName+"_E"  ).c_str(),  &thisJet->m_jet_E);
+    m_tree->Branch((jetName+"_m"  ).c_str(),  &thisJet->m_jet_m);
     m_tree->Branch((jetName+"_pt" ).c_str(),  &thisJet->m_jet_pt);
     m_tree->Branch((jetName+"_phi").c_str(),  &thisJet->m_jet_phi);
     m_tree->Branch((jetName+"_eta").c_str(),  &thisJet->m_jet_eta);
@@ -1977,6 +1979,7 @@ void HelpTreeBase::FillJet( const xAOD::Jet* jet_itr, const xAOD::Vertex* pv, in
     thisJet->m_jet_eta.push_back( jet_itr->eta() );
     thisJet->m_jet_phi.push_back( jet_itr->phi() );
     thisJet->m_jet_E.push_back  ( jet_itr->e() / m_units );
+    thisJet->m_jet_m.push_back  ( jet_itr->m() / m_units );
   }
 
   if( m_thisJetInfoSwitch[jetName]->m_rapidity ){
@@ -2630,6 +2633,7 @@ void HelpTreeBase::ClearJets(const std::string jetName) {
     thisJet->m_jet_eta.clear();
     thisJet->m_jet_phi.clear();
     thisJet->m_jet_E.clear();
+    thisJet->m_jet_m.clear();
   }
 
 
@@ -3004,26 +3008,13 @@ void HelpTreeBase::AddFatJets(std::string detailStr) {
     m_tree->Branch((jetName+"_truth_trimmed_pt").c_str(), &m_fatjet_truth_trimmed_pt);
   }
   if ( m_fatJetInfoSwitch->m_substructure ) {
-    m_tree->Branch("fatjet_tau1", &m_fatjet_tau1);
-    m_tree->Branch("fatjet_tau2", &m_fatjet_tau2);
-    m_tree->Branch("fatjet_tau3", &m_fatjet_tau3);
-    m_tree->Branch("fatjet_tau1_wta", &m_fatjet_tau1_wta);
-    m_tree->Branch("fatjet_tau2_wta", &m_fatjet_tau2_wta);
-    m_tree->Branch("fatjet_tau3_wta", &m_fatjet_tau3_wta);
-    m_tree->Branch("fatjet_Split12", &m_fatjet_Split12);
-    m_tree->Branch("fatjet_Split23", &m_fatjet_Split23);
-    m_tree->Branch("fatjet_Split34", &m_fatjet_Split34);
-    m_tree->Branch("fatjet_ZCut12", &m_fatjet_ZCut12);
-    m_tree->Branch("fatjet_ZCut23", &m_fatjet_ZCut23);
-    m_tree->Branch("fatjet_ZCut34", &m_fatjet_ZCut34);
-    m_tree->Branch("fatjet_Mu12", &m_fatjet_Mu12);
-    m_tree->Branch("fatjet_ThrustMin", &m_fatjet_ThrustMin);
-    m_tree->Branch("fatjet_ThrustMaj", &m_fatjet_ThrustMaj);
-    m_tree->Branch("fatjet_Sphericity", &m_fatjet_Sphericity);
-    m_tree->Branch("fatjet_Aplanarity", &m_fatjet_Aplanarity);
-    m_tree->Branch("fatjet_KtDR", &m_fatjet_KtDR);
+    m_tree->Branch("fatjet_tau32_wta",   &m_fatjet_tau32_wta);
+    m_tree->Branch("fatjet_tau21_wta",&m_fatjet_tau21_wta);
+    m_tree->Branch("fatjet_split12",&m_fatjet_split12);
+    m_tree->Branch("fatjet_D2",&m_fatjet_D2);
+    m_tree->Branch("fatjet_C2",&m_fatjet_C2);
+    m_tree->Branch("fatjet_NTrimSubjets",&m_fatjet_NTrimSubjets);
   }
-
   this->AddFatJetsUser();
 }
 
@@ -3063,114 +3054,71 @@ void HelpTreeBase::FillFatJets( const xAOD::JetContainer* fatJets ){
       m_fatjet_E.push_back  ( fatjet_itr->e() / m_units );
     }
     if( m_fatJetInfoSwitch->m_substructure ){
-      static SG::AuxElement::ConstAccessor<float> tau1 ("Tau1");
-      static SG::AuxElement::ConstAccessor<float> tau2 ("Tau2");
-      static SG::AuxElement::ConstAccessor<float> tau3 ("Tau3");
+      //n-subjettiness mess due to the way systematics are implemented
+      static SG::AuxElement::ConstAccessor<float> tau32_wta ("Tau32_wta");
+      static SG::AuxElement::ConstAccessor<float> tau32_WTA ("Tau32_WTA");
+      static SG::AuxElement::ConstAccessor<float> tau21_wta ("Tau21_wta");
+      static SG::AuxElement::ConstAccessor<float> tau21_WTA ("Tau21_WTA");
       static SG::AuxElement::ConstAccessor<float> tau1_wta ("Tau1_wta");
       static SG::AuxElement::ConstAccessor<float> tau2_wta ("Tau2_wta");
       static SG::AuxElement::ConstAccessor<float> tau3_wta ("Tau3_wta");
-      static SG::AuxElement::ConstAccessor<float> Split12 ("Split12");
-      static SG::AuxElement::ConstAccessor<float> Split23 ("Split23");
-      static SG::AuxElement::ConstAccessor<float> Split34 ("Split34");
-      static SG::AuxElement::ConstAccessor<float> ZCut12 ("ZCut12");
-      static SG::AuxElement::ConstAccessor<float> ZCut23 ("ZCut23");
-      static SG::AuxElement::ConstAccessor<float> ZCut34 ("ZCut34");
-      static SG::AuxElement::ConstAccessor<float> Mu12 ("Mu12");      
-      static SG::AuxElement::ConstAccessor<float> ThrustMin ("ThrustMin");
-      static SG::AuxElement::ConstAccessor<float> ThrustMaj ("ThrustMaj");
-      static SG::AuxElement::ConstAccessor<float> Sphericity ("Sphericity");
-      static SG::AuxElement::ConstAccessor<float> Aplanarity ("Aplanarity");
-      static SG::AuxElement::ConstAccessor<float> KtDR ("KtDR");
-
-      if ( tau1.isAvailable( *fatjet_itr ) ){
-        m_fatjet_tau1.push_back( tau1( *fatjet_itr ) );
+      static SG::AuxElement::ConstAccessor<float> tau1_WTA ("Tau1_WTA");
+      static SG::AuxElement::ConstAccessor<float> tau2_WTA ("Tau2_WTA");
+      static SG::AuxElement::ConstAccessor<float> tau3_WTA ("Tau3_WTA");
+      
+      if ( tau32_wta.isAvailable( *fatjet_itr )){
+        m_fatjet_tau32_wta.push_back( tau32_wta( *fatjet_itr ) );	
+      }
+      else if ( tau32_WTA.isAvailable( *fatjet_itr )){
+        m_fatjet_tau32_wta.push_back( tau32_WTA( *fatjet_itr ) );	
+      }
+      else if ( tau2_wta.isAvailable( *fatjet_itr ) && tau3_wta.isAvailable( *fatjet_itr ) ) {
+        m_fatjet_tau32_wta.push_back( tau3_wta( *fatjet_itr ) / tau2_wta( *fatjet_itr ) );
       } 
-      else { m_fatjet_tau1.push_back( -999 ); }
-
-      if ( tau2.isAvailable( *fatjet_itr ) ){
-        m_fatjet_tau2.push_back( tau2( *fatjet_itr ) );
+      else if ( tau2_WTA.isAvailable( *fatjet_itr ) && tau3_WTA.isAvailable( *fatjet_itr ) ) {
+        m_fatjet_tau32_wta.push_back( tau3_WTA( *fatjet_itr ) / tau2_WTA( *fatjet_itr ) );
       } 
-      else { m_fatjet_tau2.push_back( -999 ); }
+      else { m_fatjet_tau32_wta.push_back( -999 ); }
 
-      if ( tau3.isAvailable( *fatjet_itr ) ){
-        m_fatjet_tau3.push_back( tau3( *fatjet_itr ) );
+      if ( tau21_wta.isAvailable( *fatjet_itr )){
+        m_fatjet_tau21_wta.push_back( tau21_wta( *fatjet_itr ) );	
+      }
+      else if ( tau21_WTA.isAvailable( *fatjet_itr )){
+        m_fatjet_tau21_wta.push_back( tau21_WTA( *fatjet_itr ) );	
+      }
+      else if ( tau2_wta.isAvailable( *fatjet_itr ) && tau1_wta.isAvailable( *fatjet_itr ) ) {
+        m_fatjet_tau21_wta.push_back( tau2_wta( *fatjet_itr ) / tau1_wta( *fatjet_itr ) );
       } 
-      else { m_fatjet_tau3.push_back( -999 ); }
-
-      if ( tau1_wta.isAvailable( *fatjet_itr ) ){
-        m_fatjet_tau1_wta.push_back( tau1_wta( *fatjet_itr ) );
+      else if ( tau2_WTA.isAvailable( *fatjet_itr ) && tau1_WTA.isAvailable( *fatjet_itr ) ) {
+        m_fatjet_tau21_wta.push_back( tau2_WTA( *fatjet_itr ) / tau1_WTA( *fatjet_itr ) );
       } 
-      else { m_fatjet_tau1_wta.push_back( -999 ); }
-
-      if ( tau2_wta.isAvailable( *fatjet_itr ) ){
-        m_fatjet_tau2_wta.push_back( tau2_wta( *fatjet_itr ) );
+      else { m_fatjet_tau21_wta.push_back( -999 ); }
+      //other substructure
+      static SG::AuxElement::ConstAccessor<float> split12 ("Split12");
+      static SG::AuxElement::ConstAccessor<float> ECF1("ECF1");
+      static SG::AuxElement::ConstAccessor<float> ECF2("ECF2");
+      static SG::AuxElement::ConstAccessor<float> ECF3("ECF3");
+      static SG::AuxElement::ConstAccessor<int> NTrimSubjets("NTrimSubjets");
+      if( split12.isAvailable( *fatjet_itr )){
+	m_fatjet_split12.push_back( split12(*fatjet_itr) / m_units );
+      }
+      else{
+	m_fatjet_split12.push_back(-999);
+      }
+      if( ECF1.isAvailable(*fatjet_itr) && ECF2.isAvailable(*fatjet_itr) && ECF3.isAvailable(*fatjet_itr)){
+	m_fatjet_D2.push_back( ECF3(*fatjet_itr)*pow(ECF1(*fatjet_itr),3.0)/pow(ECF2(*fatjet_itr),3.0));
+	m_fatjet_C2.push_back( ECF3(*fatjet_itr)*ECF1(*fatjet_itr)/pow(ECF2(*fatjet_itr),2.0));
       } 
-      else { m_fatjet_tau2_wta.push_back( -999 ); }
-
-      if ( tau3_wta.isAvailable( *fatjet_itr ) ){
-        m_fatjet_tau3_wta.push_back( tau3_wta( *fatjet_itr ) );
-      } 
-      else { m_fatjet_tau3_wta.push_back( -999 ); }
-
-      if ( Split12.isAvailable( *fatjet_itr ) ){
-        m_fatjet_Split12.push_back( Split12( *fatjet_itr ) );
-      } 
-      else { m_fatjet_Split12.push_back( -999 ); }
-
-      if ( Split23.isAvailable( *fatjet_itr ) ){
-        m_fatjet_Split23.push_back( Split23( *fatjet_itr ) );
-      } 
-      else { m_fatjet_Split23.push_back( -999 ); }
-
-      if ( Split34.isAvailable( *fatjet_itr ) ){
-        m_fatjet_Split34.push_back( Split34( *fatjet_itr ) );
-      } 
-      else { m_fatjet_Split34.push_back( -999 ); }
-
-      if ( ZCut12.isAvailable( *fatjet_itr ) ){
-        m_fatjet_ZCut12.push_back( ZCut12( *fatjet_itr ) );
-      } 
-      else { m_fatjet_ZCut12.push_back( -999 ); }
-
-      if ( ZCut23.isAvailable( *fatjet_itr ) ){
-        m_fatjet_ZCut23.push_back( ZCut23( *fatjet_itr ) );
-      } 
-      else { m_fatjet_ZCut23.push_back( -999 ); }
-
-      if ( ZCut34.isAvailable( *fatjet_itr ) ){
-        m_fatjet_ZCut34.push_back( ZCut34( *fatjet_itr ) );
-      } 
-      else { m_fatjet_ZCut34.push_back( -999 ); }
-
-      if ( Mu12.isAvailable( *fatjet_itr ) ){
-        m_fatjet_Mu12.push_back( Mu12( *fatjet_itr ) );
-      } 
-      else { m_fatjet_Mu12.push_back( -999 ); }
-
-      if ( ThrustMin.isAvailable( *fatjet_itr ) ){
-        m_fatjet_ThrustMin.push_back( ThrustMin( *fatjet_itr ) );
-      } 
-      else { m_fatjet_ThrustMin.push_back( -999 ); }
-
-      if ( ThrustMaj.isAvailable( *fatjet_itr ) ){
-        m_fatjet_ThrustMaj.push_back( ThrustMaj( *fatjet_itr ) );
-      } 
-      else { m_fatjet_ThrustMaj.push_back( -999 ); }
-
-      if ( Sphericity.isAvailable( *fatjet_itr ) ){
-        m_fatjet_Sphericity.push_back( Sphericity( *fatjet_itr ) );
-      } 
-      else { m_fatjet_Sphericity.push_back( -999 ); }
-
-     if ( Aplanarity.isAvailable( *fatjet_itr ) ){
-        m_fatjet_Aplanarity.push_back( Aplanarity( *fatjet_itr ) );
-      } 
-      else { m_fatjet_Aplanarity.push_back( -999 ); }
-
-     if ( KtDR.isAvailable( *fatjet_itr ) ){
-        m_fatjet_KtDR.push_back( KtDR( *fatjet_itr ) );
-      } 
-      else { m_fatjet_KtDR.push_back( -999 ); }
+      else{
+	m_fatjet_D2.push_back(-999);
+	m_fatjet_C2.push_back(-999);
+      }
+      if( NTrimSubjets.isAvailable(*fatjet_itr) ){
+	m_fatjet_NTrimSubjets.push_back(NTrimSubjets(*fatjet_itr));
+      }
+      else{
+	m_fatjet_NTrimSubjets.push_back(-999);
+      }
     }
     this->FillFatJetsUser(fatjet_itr);
 
@@ -3199,24 +3147,12 @@ void HelpTreeBase::ClearFatJets() {
     m_fatjet_truth_trimmed_pt.clear();
   }
   if( m_fatJetInfoSwitch->m_substructure ){
-    m_fatjet_tau1.clear();
-    m_fatjet_tau2.clear();
-    m_fatjet_tau3.clear();
-    m_fatjet_tau1_wta.clear();
-    m_fatjet_tau2_wta.clear();
-    m_fatjet_tau3_wta.clear();
-    m_fatjet_Split12.clear();
-    m_fatjet_Split23.clear();
-    m_fatjet_Split34.clear();
-    m_fatjet_ZCut12.clear();
-    m_fatjet_ZCut23.clear();
-    m_fatjet_ZCut34.clear();
-    m_fatjet_Mu12.clear();
-    m_fatjet_ThrustMin.clear();
-    m_fatjet_ThrustMaj.clear();
-    m_fatjet_Sphericity.clear();
-    m_fatjet_Aplanarity.clear();
-    m_fatjet_KtDR.clear();
+    m_fatjet_tau32_wta.clear();
+    m_fatjet_tau21_wta.clear();
+    m_fatjet_split12.clear();
+    m_fatjet_D2.clear();
+    m_fatjet_C2.clear();
+    m_fatjet_NTrimSubjets.clear();
   }
 
 }
@@ -3232,8 +3168,8 @@ void HelpTreeBase::ClearEvent() {
   m_TileFlags = 0;
   m_SCTFlags = 0;
   m_mcEventWeight = 1.;
-  m_weight_xs = 1;
-  m_weight = 1;
+  m_weight_xs = 1.;
+  m_weight = 1.;
   m_weight_pileup = 1.;
   m_timeStamp = -999;
   m_timeStampNSOffset = -999;

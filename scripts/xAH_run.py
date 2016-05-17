@@ -133,8 +133,11 @@ parser.add_argument( '--treeName', dest="treeName",     default="CollectionTree"
 parser.add_argument( '--isMC',     action="store_true", dest="is_MC",    default=False, help="Running MC")
 parser.add_argument( '--isSignal', action="store_true", dest="is_signal", default=False,help="Running privately produced signal")
 parser.add_argument( '--isAFII',   action="store_true", dest="is_AFII",  default=False, help="Running on AFII")
-
-
+parser.add_argument( '--xsec', dest='xsec', type = float, default = None, help = 'xsec*filtEff')
+parser.add_argument( '--AMI',dest='xsecFromAMI',action='store_true',help='If enabled, will query AMI for cross section, filter efficiency, and dsid')
+parser.add_argument('--dsidFromFileName',dest='dsidFromFileName',action='store_true',help='If enabled, will pull dsid from filename')
+parser.add_argument( '--dsid', dest='dsid', type = str, default = None, help = 'DSID')
+parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
 parser.add_argument('--inputList', dest='use_inputFileList', action='store_true', help='If enabled, will read in a text file containing a list of paths/filenames.')
 parser.add_argument('--inputTag', dest='inputTag', default="", help='A wildcarded name of input files to run on.')
 parser.add_argument('--inputDQ2', dest='use_scanDQ2', action='store_true', help='If enabled, will search using DQ2. Can be combined with `--inputList`.')
@@ -365,6 +368,19 @@ if __name__ == "__main__":
                 ROOT.SH.ScanDir().sampleDepth(0).samplePattern(args.eosDataSet).scanEOS(sh_all,base)
               else:
                 raise Exception("What just happened?")
+              if args.xsecFromAMI:
+                import pyAMI.client
+                import pyAMI.atlas.api as AtlasAPI
+                from pyAMI.atlas.api import get_dataset_info
+                client = pyAMI.client.Client('atlas')
+                AtlasAPI.init()
+                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
+                filtEff=float(d['genFiltEff'])
+                xsec=float(d['crossSection'])
+                dsid=str(d['datasetNumber'])
+                sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
+                sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
+                print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
@@ -420,7 +436,6 @@ if __name__ == "__main__":
     # print out the samples we found
     xAH_logger.info("\t%d different dataset(s) found", len(sh_all))
     sh_all.printContent()
-
     if len(sh_all) == 0:
       xAH_logger.info("No datasets found. Exiting.")
       sys.exit(0)
@@ -429,50 +444,13 @@ if __name__ == "__main__":
     sh_all.setMetaString( "nc_tree", args.treeName)
     #sh_all.setMetaString( "nc_excludeSite", "ANALY_RAL_SL6");
     sh_all.setMetaString( "nc_grid_filter", "*");
-    pList = []
-    if args.dsName:
-      sampleNameList=[args.dsName]
-    elif args.isPrivate:
-      dot = '.'
-      und = '_'
-      pList = [sampleName[:-1] for sampleName in sampleNameList]
-      sampleNameList=['mc15_13TeV.'+dot.join(sampleName.split(dot)[2:]) for sampleName in sampleNameList]
-
-      sampleNameList=[und.join(sampleName.split(und)[:-3])+'/' for sampleName in sampleNameList]
-    if args.is_MC and not args.is_signal and args.driver != "direct":
-      if not args.isPrivate:
-        pList =['mc15_13TeV.'+sampleName.split('.')[1]+'.*' for sampleName in sampleNameList]
-      for i in range(len(pList)):
-        (dsid,weight_xs) = getInfoFromAMI(sampleNameList[i])
-        sh_all.setMetaString(pList[i],'dsid',dsid)
-        sh_all.setMetaDouble(pList[i],'weight_xs',weight_xs)
-        print('datasetNumber = ',dsid,'weight_xs = ',weight_xs)
-      print('Found sample: ',)
-#      sh_all.findByName(pList[0]).printContent()
-      if args.no_vtx:
-        sh_all.setMetaDouble('no_vtx',1)
-    if args.is_signal:
-      for sampleName in sampleNameList:
-        dsid = sampleName.split('.')[2]
-        heavyMass = 0
-        weight_xs = 1.0
-        if dsid == 'fastsim' or dsid == 'fullsim' or dsid == 'Local':
-          heavyMass = 1250
-          dsid='403104'
-          weight_xs = pointdictGG[heavyMass]
-        elif int(dsid) < 883000:
-          heavyMass = int(str(dsid)[3])*100+800
-          weight_xs = pointdictGG[heavyMass]
-        else:
-          heavyMass = (int(dsid)-883000)*50 + 950
-          weight_xs = pointdictTT[heavyMass]
-        print('datasetNumber =',dsid,'mHeavy =',heavyMass,'weight_xs =',weight_xs)
-        sh_all.setMetaString('dsid',str(dsid))
-        sh_all.setMetaDouble('weight_xs',weight_xs)
-        if args.no_vtx:
-          sh_all.setMetaDouble('no_vtx',1)
-    sh_all.printContent()
-
+    if args.dsid:
+      sh_all.setMetaString('dsid',args.dsid)
+    if args.xsec:
+      sh_all.setMetaDouble('weight_xs',args.xsec)
+      
+    if args.no_vtx:
+      sh_all.setMetaDouble('no_vtx',1)
     # read susy meta data (should be configurable)
     xAH_logger.info("reading all metadata in $ROOTCOREBIN/data/xAODAnaHelpers/metadata")
     ROOT.SH.readSusyMetaDir(sh_all,"$ROOTCOREBIN/data/xAODAnaHelpers/metadata")
