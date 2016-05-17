@@ -2968,14 +2968,6 @@ void HelpTreeBase::AddFatJets(std::string detailStr) {
     m_tree->Branch("fatjet_phi", &m_fatjet_phi);
     m_tree->Branch("fatjet_eta", &m_fatjet_eta);
   }
-  if ( m_fatJetInfoSwitch->m_truth && m_isMC ) {
-    m_tree->Branch((jetName+"_truth_E").c_str(),   &m_fatjet_truth_E);
-    m_tree->Branch((jetName+"_truth_pt").c_str(),  &m_fatjet_truth_pt);
-    m_tree->Branch((jetName+"_truth_phi").c_str(), &m_fatjet_truth_phi);
-    m_tree->Branch((jetName+"_truth_eta").c_str(), &m_fatjet_truth_eta);
-    m_tree->Branch((jetName+"_truth_m").c_str(),   &m_fatjet_truth_m);
-    m_tree->Branch((jetName+"_truth_trimmed_pt").c_str(), &m_fatjet_truth_trimmed_pt);
-  }
   if ( m_fatJetInfoSwitch->m_substructure ) {
     m_tree->Branch("fatjet_tau32_wta",   &m_fatjet_tau32_wta);
     m_tree->Branch("fatjet_tau21_wta",&m_fatjet_tau21_wta);
@@ -2991,30 +2983,7 @@ void HelpTreeBase::FillFatJets( const xAOD::JetContainer* fatJets ){
   this->ClearFatJets();
   this->ClearFatJetsUser();
 
-  if( m_fatJetInfoSwitch->m_truth && m_isMC){
-    /*    for (auto untrimmedfatjet_itr : *untrimmedFatJets){
-      const xAOD::Jet* truthFatJet = HelperFunctions::getLink<xAOD::Jet>( untrimmedfatjet_itr, "GhostTruthAssociationLink" );
-      if(truthFatJet) {
-	m_fatjet_truth_pt.push_back ( truthFatJet->pt() / m_units );
-	m_fatjet_truth_eta.push_back ( truthFatJet->eta() );
-	m_fatjet_truth_phi.push_back ( truthFatJet->phi() );
-	m_fatjet_truth_m.push_back ( truthFatJet->m() / m_units );
-	m_fatjet_truth_E.push_back ( truthFatJet->e() / m_units );
-      } else {
-	m_fatjet_truth_pt.push_back ( -999 );
-	m_fatjet_truth_eta.push_back( -999 );
-	m_fatjet_truth_phi.push_back( -999 );
-	m_fatjet_truth_E.push_back  ( -999 );
-	m_fatjet_truth_m.push_back  ( -999 );
-      }
-      }*/
-  }
   for( auto fatjet_itr : *fatJets ) {
-    if( m_fatJetInfoSwitch->m_truth && m_isMC){
-      float ghostTruthPt = fatjet_itr->auxdata<float>("GhostTruthPt");
-      m_fatjet_truth_trimmed_pt.push_back(  ghostTruthPt / m_units);
-    }
-
     if( m_fatJetInfoSwitch->m_kinematic ){
       m_fatjet_pt.push_back ( fatjet_itr->pt() / m_units );
       m_fatjet_m.push_back ( fatjet_itr->m() / m_units );
@@ -3106,14 +3075,6 @@ void HelpTreeBase::ClearFatJets() {
     m_fatjet_phi.clear();
     m_fatjet_E.clear();
     m_fatjet_m.clear();
-  }
-  if( m_fatJetInfoSwitch->m_truth){
-    m_fatjet_truth_pt.clear();
-    m_fatjet_truth_eta.clear();
-    m_fatjet_truth_phi.clear();
-    m_fatjet_truth_E.clear();
-    m_fatjet_truth_m.clear();
-    m_fatjet_truth_trimmed_pt.clear();
   }
   if( m_fatJetInfoSwitch->m_substructure ){
     m_fatjet_tau32_wta.clear();
