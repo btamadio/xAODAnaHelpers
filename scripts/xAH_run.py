@@ -25,47 +25,6 @@ import subprocess
 import sys
 import datetime
 import time
-import pprint
-import pyAMI.client
-import pyAMI.atlas.api as AtlasAPI
-from pyAMI.atlas.api import get_dataset_info
-
-def getInfoFromAMI(ds):
-  client = pyAMI.client.Client('atlas')
-  AtlasAPI.init()
-  d=AtlasAPI.get_dataset_info(client,ds)[0]
-  filtEff=float(d['genFiltEff'])
-  xsec=float(d['crossSection'])
-  dsid=str(d['datasetNumber'])
-  return (dsid,xsec*filtEff)
-pointdictTT={
-950:4.362E-05,
-1000:3.078E-05,
-1050:2.254E-05,
-1100:1.614E-05,
-1150:1.174E-05,
-1200:8.726E-06,
-1250:6.479E-06,
-1300:4.826E-06,
-1350:3.63E-06,
-1400:2.743E-06,
-1450:2.079E-06,
-1500:1.585E-06,
-1550:1.213E-06,
-1600:1.213E-06-(1.585E-06-1.213E-06)
-}
-pointdictGG = {
-800:0.0014891,
-900:0.000677478,
-1000:0.000325388,
-1100:0.000163491,
-1200:0.0000856418,
-1250:0.0000627027,
-1300:0.0000460525,
-1400:0.0000252977,
-1500:0.0000141903,
-1600:0.00000810078
-}
 
 # think about using argcomplete
 # https://argcomplete.readthedocs.org/en/latest/#activating-global-completion%20argcomplete
@@ -131,7 +90,6 @@ parser.add_argument('--version', action='version', version='xAH_run.py {version}
 parser.add_argument('--mode', dest='access_mode', type=str, metavar='{class, branch, athena}', choices=['class', 'branch', 'athena'], default='class', help='run using class access mode, branch access mode, or athena access mode')
 parser.add_argument( '--treeName', dest="treeName",     default="CollectionTree", help="Tree Name to run on")
 parser.add_argument( '--isMC',     action="store_true", dest="is_MC",    default=False, help="Running MC")
-parser.add_argument( '--isSignal', action="store_true", dest="is_signal", default=False,help="Running privately produced signal")
 parser.add_argument( '--isAFII',   action="store_true", dest="is_AFII",  default=False, help="Running on AFII")
 parser.add_argument( '--xsec', dest='xsec', type = float, default = None, help = 'xsec*filtEff')
 parser.add_argument( '--AMI',dest='xsecFromAMI',action='store_true',help='If enabled, will query AMI for cross section, filter efficiency, and dsid')
@@ -143,10 +101,6 @@ parser.add_argument('--inputTag', dest='inputTag', default="", help='A wildcarde
 parser.add_argument('--inputDQ2', dest='use_scanDQ2', action='store_true', help='If enabled, will search using DQ2. Can be combined with `--inputList`.')
 parser.add_argument('--inputEOS', action='store_true', dest='use_scanEOS', default=False, help='If enabled, will search using EOS. Can be combined with `--inputList and inputTag`.')
 parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0, help='Enable verbose output of various levels. Can increase verbosity by adding more ``-vv``. Default: no verbosity')
-
-parser.add_argument('-d','--dsName',dest='dsName',help='Specify dataset name to get from AMI')
-parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
-parser.add_argument('--private',dest='isPrivate',action='store_true',default=False,help='Indicate that Herwig++ multijet sample is being submitted, which requires a different datset name submitted to AMI')
 
 # first is the driver common arguments
 drivers_common = argparse.ArgumentParser(add_help=False, description='Common Driver Arguments')
@@ -352,7 +306,6 @@ if __name__ == "__main__":
         xAH_logger.info("\t\tAdding samples using scanEOS")
       else:
         xAH_logger.info("\t\tAdding samples using scanDir")
-    sampleNameList=[]
     for fname in args.input_filename:
       if args.use_inputFileList:
         if (args.use_scanDQ2 or use_scanEOS):
@@ -362,7 +315,6 @@ if __name__ == "__main__":
               if not line.strip()     : continue
               if args.use_scanDQ2:
                 ROOT.SH.scanDQ2(sh_all, line.rstrip())
-                sampleNameList.append(line.rstrip())
               elif use_scanEOS:
                 base = os.path.basename(line)
                 ROOT.SH.ScanDir().sampleDepth(0).samplePattern(args.eosDataSet).scanEOS(sh_all,base)
@@ -384,7 +336,6 @@ if __name__ == "__main__":
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
-          sampleNameList.append(sname)
           # Read settings
           fcname=os.path.dirname(fname)+'/'+sname+'.config' # replace .txt with .config
           config={}
@@ -407,7 +358,6 @@ if __name__ == "__main__":
       else:
         if args.use_scanDQ2:
           ROOT.SH.scanDQ2(sh_all, fname)
-          sampleNameList.append(fname.rstrip())
         elif use_scanEOS:
           newEOS = True
           if not newEOS:
@@ -432,7 +382,6 @@ if __name__ == "__main__":
           mother_dir = os.path.dirname(sample_dir)
           sh_list = ROOT.SH.DiskListLocal(mother_dir)
           ROOT.SH.scanDir(sh_all, sh_list, fname_base, os.path.basename(sample_dir))
-          sampleNameList.append(fname_base)
     # print out the samples we found
     xAH_logger.info("\t%d different dataset(s) found", len(sh_all))
     sh_all.printContent()

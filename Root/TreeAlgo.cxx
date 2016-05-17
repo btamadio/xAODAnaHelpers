@@ -43,7 +43,6 @@ TreeAlgo :: TreeAlgo (std::string className) :
   m_elContainerName         = "";
   m_jetContainerName        = "";
   m_fatJetContainerName     = "";
-  //  m_untrimmedFatJetContainerName = "";
   m_tauContainerName        = "";
   m_METContainerName        = "";
   m_photonContainerName     = "";
@@ -79,10 +78,12 @@ EL::StatusCode TreeAlgo :: initialize ()
   Info("initialize()", m_name.c_str());
   m_event = wk()->xaodEvent();
   m_store = wk()->xaodStore();
+
   // get the file we created already
   TFile* treeFile = wk()->getOutputFile ("tree");
   treeFile->mkdir(m_name.c_str());
   treeFile->cd(m_name.c_str());
+
   return EL::StatusCode::SUCCESS;
 }
 
@@ -95,6 +96,8 @@ EL::StatusCode TreeAlgo :: histInitialize ()
 
 EL::StatusCode TreeAlgo :: fileExecute () { return EL::StatusCode::SUCCESS; }
 EL::StatusCode TreeAlgo :: changeInput (bool /*firstFile*/) { return EL::StatusCode::SUCCESS; }
+
+
 EL::StatusCode TreeAlgo :: execute ()
 {
 
@@ -221,6 +224,7 @@ EL::StatusCode TreeAlgo :: execute ()
     if (std::find(photonSystNames.begin(), photonSystNames.end(), systName) != photonSystNames.end()) photonSuffix = systName;
 
     helpTree->FillEvent( eventInfo, m_event );
+
     // Fill trigger information
     if ( !m_trigDetailStr.empty() )    {
       helpTree->FillTrigger( eventInfo );

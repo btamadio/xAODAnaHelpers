@@ -505,12 +505,10 @@ EL::StatusCode BasicEventSelection :: initialize ()
     }
     Info("initialize()", "Adding Pileup files for CP::PileupReweightingTool:");
     for( unsigned int i=0; i < PRWFiles.size(); ++i){
-      //      PRWFiles.at(i) = gSystem->ExpandPathName(PRWFiles.at(i).c_str());
       printf( "\t %s \n", PRWFiles.at(i).c_str() );
     }
     Info("initialize()", "Adding LumiCalc files for CP::PileupReweightingTool:");
     for( unsigned int i=0; i < lumiCalcFiles.size(); ++i){
-      //      lumiCalcFiles.at(i) = gSystem->ExpandPathName(lumiCalcFiles.at(i).c_str());
       printf( "\t %s \n", lumiCalcFiles.at(i).c_str() );
     }
 

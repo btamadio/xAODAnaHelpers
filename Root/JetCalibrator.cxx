@@ -506,7 +506,7 @@ EL::StatusCode JetCalibrator :: execute ()
 	      validForJES &= (fabs(jet_itr->eta()) < 2);
 	      if (!validForJES) continue;
 	    }
-	    if ( m_JESUncertTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
+	     if ( m_JESUncertTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
               Error("execute()", "JetUncertaintiesTool reported a CP::CorrectionCode::Error");
               Error("execute()", "%s", m_name.c_str());
           }
