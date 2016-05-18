@@ -451,7 +451,7 @@ EL::StatusCode JetCalibrator :: execute ()
     if ( TruthLabelID.isAvailable( *jet_itr) ) {
       this_TruthLabel = TruthLabelID( *jet_itr );
       if (this_TruthLabel == 21 || this_TruthLabel<4) this_TruthLabel = 0;
-    } else {
+    } else if( PartonTruthLabelID.isAvailable( *jet_itr)){
       this_TruthLabel = PartonTruthLabelID( *jet_itr );
       if (this_TruthLabel == 21 || this_TruthLabel<4) this_TruthLabel = 0;
     }

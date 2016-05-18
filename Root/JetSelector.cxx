@@ -877,7 +877,7 @@ int JetSelector :: PassCuts( const xAOD::Jet* jet ) {
     } else if ( TruthLabelID.isAvailable( *jet) ) {
       this_TruthLabel = TruthLabelID( *jet );
       if (this_TruthLabel == 21 || this_TruthLabel<4) this_TruthLabel = 0;
-    } else {
+    } else if ( PartonTruthLabelID.isAvailable( *jet)){
       this_TruthLabel = PartonTruthLabelID( *jet );
       if (this_TruthLabel == 21 || this_TruthLabel<4) this_TruthLabel = 0;
     }
