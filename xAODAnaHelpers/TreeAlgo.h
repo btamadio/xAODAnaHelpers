@@ -47,6 +47,7 @@ public:
   std::string m_muSystsVec;
   std::string m_elSystsVec;
   std::string m_jetSystsVec;
+  std::string m_fatJetSystsVec;
   std::string m_photonSystsVec;
 
   bool m_DC14;

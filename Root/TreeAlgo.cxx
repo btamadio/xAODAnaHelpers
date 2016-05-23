@@ -51,7 +51,7 @@ TreeAlgo :: TreeAlgo (std::string className) :
   m_elSystsVec              = "";
   m_jetSystsVec             = "";
   m_photonSystsVec          = "";
-
+  m_fatJetSystsVec          = "";
   // DC14 switch for little things that need to happen to run
   // for those samples with the corresponding packages
   m_DC14                    = false;
@@ -108,6 +108,7 @@ EL::StatusCode TreeAlgo :: execute ()
   std::vector<std::string> elSystNames;
   std::vector<std::string> jetSystNames;
   std::vector<std::string> photonSystNames;
+  std::vector<std::string> fatJetSystNames;
 
   // this is a temporary pointer that gets switched around to check each of the systematics
   std::vector<std::string>* systNames(nullptr);
@@ -140,7 +141,14 @@ EL::StatusCode TreeAlgo :: execute ()
       jetSystNames.push_back(systName);
     }
   }
-
+  if(!m_fatJetSystsVec.empty()){
+    RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(systNames, m_fatJetSystsVec, 0, m_store, m_verbose) ,"");
+    for(const auto& systName: *systNames){
+      if (std::find(event_systNames.begin(), event_systNames.end(), systName) != event_systNames.end()) continue;
+      event_systNames.push_back(systName);
+      fatJetSystNames.push_back(systName);
+    }
+  }
   if(!m_photonSystsVec.empty()){
     RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(systNames, m_photonSystsVec, 0, m_store, m_verbose) ,"");
     for(const auto& systName: *systNames){
@@ -210,6 +218,7 @@ EL::StatusCode TreeAlgo :: execute ()
     std::string muSuffix("");
     std::string elSuffix("");
     std::string jetSuffix("");
+    std::string fatJetSuffix("");
     std::string photonSuffix("");
     /*
        if we find the systematic in the corresponding vector, we will use that container's systematic version instead of nominal version
@@ -221,9 +230,10 @@ EL::StatusCode TreeAlgo :: execute ()
     if (std::find(muSystNames.begin(), muSystNames.end(), systName) != muSystNames.end()) muSuffix = systName;
     if (std::find(elSystNames.begin(), elSystNames.end(), systName) != elSystNames.end()) elSuffix = systName;
     if (std::find(jetSystNames.begin(), jetSystNames.end(), systName) != jetSystNames.end()) jetSuffix = systName;
+    if (std::find(fatJetSystNames.begin(), fatJetSystNames.end(), systName) != fatJetSystNames.end()) fatJetSuffix = systName;
     if (std::find(photonSystNames.begin(), photonSystNames.end(), systName) != photonSystNames.end()) photonSuffix = systName;
-
-    helpTree->FillEvent( eventInfo, m_event );
+    
+    helpTree->FillEvent( eventInfo, m_event,wk()->metaData()->castDouble("weight_xs",1) );
 
     // Fill trigger information
     if ( !m_trigDetailStr.empty() )    {
@@ -269,7 +279,7 @@ EL::StatusCode TreeAlgo :: execute ()
     }
     if ( !m_fatJetContainerName.empty() ) {
       const xAOD::JetContainer* inFatJets(nullptr);
-      RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inFatJets, m_fatJetContainerName, m_event, m_store, m_verbose) ,"");
+      RETURN_CHECK("TreeAlgo::execute()", HelperFunctions::retrieve(inFatJets, m_fatJetContainerName+fatJetSuffix, m_event, m_store, m_verbose) ,"");
       helpTree->FillFatJets( inFatJets );
     }
     if ( !m_tauContainerName.empty() ) {
