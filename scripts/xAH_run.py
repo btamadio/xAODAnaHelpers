@@ -326,13 +326,26 @@ if __name__ == "__main__":
                 from pyAMI.atlas.api import get_dataset_info
                 client = pyAMI.client.Client('atlas')
                 AtlasAPI.init()
-                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
-                filtEff=float(d['genFiltEff'])
-                xsec=float(d['crossSection'])
+                evntName = line.rstrip().replace('merge.DAOD_EXOT3','evgen.EVNT')
+                evntName = evntName[0:evntName.find('evgen.EVNT')+16]
+#                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
+                d=AtlasAPI.get_dataset_info(client,evntName)[0]
+                filtEff = 1
+                xsec = 1
+                if 'genFiltEff' in d:
+                  if d['genFiltEff'] != 'NULL':
+                    filtEff=float(d['genFiltEff'])
+                elif 'GenFiltEff_mean' in d:
+                  if d['GenFiltEff_mean'] != 'NULL':
+                    filtEff=float(d['GenFiltEff_mean'])
+                if 'crossSection' in d:
+                  if d['crossSection'] != 'NULL':
+                    xsec=float(d['crossSection'])
                 dsid=str(d['datasetNumber'])
                 sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
                 sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
                 print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
+          sys.exit(0)
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
