@@ -326,12 +326,18 @@ if __name__ == "__main__":
                 from pyAMI.atlas.api import get_dataset_info
                 client = pyAMI.client.Client('atlas')
                 AtlasAPI.init()
-                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
+                evntName = line.rstrip().replace('merge.DAOD_EXOT3','evgen.EVNT')
+                evntName = evntName[0:evntName.find('evgen.EVNT')+16]
+#                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
+                d=AtlasAPI.get_dataset_info(client,evntName)[0]
                 filtEff = 1
                 xsec = 1
                 if 'genFiltEff' in d:
                   if d['genFiltEff'] != 'NULL':
                     filtEff=float(d['genFiltEff'])
+                elif 'GenFiltEff_mean' in d:
+                  if d['GenFiltEff_mean'] != 'NULL':
+                    filtEff=float(d['GenFiltEff_mean'])
                 if 'crossSection' in d:
                   if d['crossSection'] != 'NULL':
                     xsec=float(d['crossSection'])
