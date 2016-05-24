@@ -345,6 +345,7 @@ if __name__ == "__main__":
                 sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
                 sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
                 print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
+          sys.exit(0)
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
