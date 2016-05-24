@@ -327,8 +327,14 @@ if __name__ == "__main__":
                 client = pyAMI.client.Client('atlas')
                 AtlasAPI.init()
                 d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
-                filtEff=float(d['genFiltEff'])
-                xsec=float(d['crossSection'])
+                filtEff = 1
+                xsec = 1
+                if 'genFiltEff' in d:
+                  if d['genFiltEff'] != 'NULL':
+                    filtEff=float(d['genFiltEff'])
+                if 'crossSection' in d:
+                  if d['crossSection'] != 'NULL':
+                    xsec=float(d['crossSection'])
                 dsid=str(d['datasetNumber'])
                 sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
                 sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
