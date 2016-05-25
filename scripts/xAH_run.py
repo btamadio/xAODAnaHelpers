@@ -326,8 +326,10 @@ if __name__ == "__main__":
                 from pyAMI.atlas.api import get_dataset_info
                 client = pyAMI.client.Client('atlas')
                 AtlasAPI.init()
-                evntName = line.rstrip().replace('merge.DAOD_EXOT3','evgen.EVNT')
-                evntName = evntName[0:evntName.find('evgen.EVNT')+16]
+                evntName = line.rstrip()
+                if 'merge.DAOD_EXOT3' in evntName:
+                  evntName = evntName.replace('merge.DAOD_EXOT3','evgen.EVNT')
+                  evntName = evntName[0:evntName.find('evgen.EVNT')+16]
 #                d=AtlasAPI.get_dataset_info(client,line.rstrip())[0]
                 d=AtlasAPI.get_dataset_info(client,evntName)[0]
                 filtEff = 1
@@ -345,7 +347,6 @@ if __name__ == "__main__":
                 sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
                 sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
                 print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
-          sys.exit(0)
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
