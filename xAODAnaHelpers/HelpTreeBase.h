@@ -557,11 +557,19 @@ protected:
   std::vector<float> m_fatjet_E;
 
   // substructure
-  std::vector<float> m_fatjet_tau32_wta;
+  std::vector<float> m_fatjet_Split12;
+  std::vector<float> m_fatjet_Split23;
+  std::vector<float> m_fatjet_Split34;
+  std::vector<float> m_fatjet_tau1_wta;
+  std::vector<float> m_fatjet_tau2_wta;
+  std::vector<float> m_fatjet_tau3_wta;
   std::vector<float> m_fatjet_tau21_wta;
-  std::vector<float> m_fatjet_split12;
-  std::vector<float> m_fatjet_D2;
+  std::vector<float> m_fatjet_tau32_wta;
+  std::vector<float> m_fatjet_ECF1;
+  std::vector<float> m_fatjet_ECF2;
+  std::vector<float> m_fatjet_ECF3;
   std::vector<float> m_fatjet_C2;
+  std::vector<float> m_fatjet_D2;
   std::vector<int> m_fatjet_NTrimSubjets;
 
   // muons
