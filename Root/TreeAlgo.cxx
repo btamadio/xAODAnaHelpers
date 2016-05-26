@@ -220,6 +220,7 @@ EL::StatusCode TreeAlgo :: execute ()
     std::string jetSuffix("");
     std::string fatJetSuffix("");
     std::string photonSuffix("");
+    std::string fatJetSuffix("");
     /*
        if we find the systematic in the corresponding vector, we will use that container's systematic version instead of nominal version
         NB: since none of these contain the "" (nominal) case because of how I filter it, we handle the merging.. why?
@@ -230,8 +231,8 @@ EL::StatusCode TreeAlgo :: execute ()
     if (std::find(muSystNames.begin(), muSystNames.end(), systName) != muSystNames.end()) muSuffix = systName;
     if (std::find(elSystNames.begin(), elSystNames.end(), systName) != elSystNames.end()) elSuffix = systName;
     if (std::find(jetSystNames.begin(), jetSystNames.end(), systName) != jetSystNames.end()) jetSuffix = systName;
-    if (std::find(fatJetSystNames.begin(), fatJetSystNames.end(), systName) != fatJetSystNames.end()) fatJetSuffix = systName;
     if (std::find(photonSystNames.begin(), photonSystNames.end(), systName) != photonSystNames.end()) photonSuffix = systName;
+    if (std::find(fatJetSystNames.begin(), fatJetSystNames.end(), systName) != fatJetSystNames.end()) fatJetSuffix = systName;
     
     helpTree->FillEvent( eventInfo, m_event,wk()->metaData()->castDouble("weight_xs",1) );
 

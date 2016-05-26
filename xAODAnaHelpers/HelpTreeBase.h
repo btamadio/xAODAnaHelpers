@@ -570,7 +570,7 @@ protected:
   std::vector<float> m_fatjet_ECF3;
   std::vector<float> m_fatjet_C2;
   std::vector<float> m_fatjet_D2;
-  std::vector<int> m_fatjet_NTrimSubjets;
+  std::vector<float> m_fatjet_NTrimSubjets;
 
   // muons
   int m_nmuon;
