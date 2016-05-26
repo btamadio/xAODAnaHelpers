@@ -35,7 +35,6 @@ public:
   std::string m_elContainerName;
   std::string m_jetContainerName;
 
-  //  std::string m_untrimmedFatJetContainerName;
   std::string m_truthJetContainerName;
   std::string m_trigJetContainerName;
   std::string m_fatJetContainerName;
@@ -47,8 +46,8 @@ public:
   std::string m_muSystsVec;
   std::string m_elSystsVec;
   std::string m_jetSystsVec;
-  std::string m_fatJetSystsVec;
   std::string m_photonSystsVec;
+  std::string m_fatJetSystsVec;
 
   bool m_DC14;
   float m_units;
