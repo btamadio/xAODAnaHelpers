@@ -219,7 +219,6 @@ EL::StatusCode TreeAlgo :: execute ()
     std::string muSuffix("");
     std::string elSuffix("");
     std::string jetSuffix("");
-    std::string fatJetSuffix("");
     std::string photonSuffix("");
     std::string fatJetSuffix("");
     /*
