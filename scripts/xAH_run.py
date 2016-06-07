@@ -25,7 +25,7 @@ import subprocess
 import sys
 import datetime
 import time
-
+from pointDict import pointDict
 # think about using argcomplete
 # https://argcomplete.readthedocs.org/en/latest/#activating-global-completion%20argcomplete
 
@@ -93,6 +93,7 @@ parser.add_argument( '--isMC',     action="store_true", dest="is_MC",    default
 parser.add_argument( '--isAFII',   action="store_true", dest="is_AFII",  default=False, help="Running on AFII")
 parser.add_argument( '--xsec', dest='xsec', type = float, default = None, help = 'xsec*filtEff')
 parser.add_argument( '--AMI',dest='xsecFromAMI',action='store_true',help='If enabled, will query AMI for cross section, filter efficiency, and dsid')
+parser.add_argument( '--dict',dest='dictFile',type=str,help='get xsec from dictionary')
 parser.add_argument('--dsidFromFileName',dest='dsidFromFileName',action='store_true',help='If enabled, will pull dsid from filename')
 parser.add_argument( '--dsid', dest='dsid', type = str, default = None, help = 'DSID')
 parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
@@ -347,6 +348,17 @@ if __name__ == "__main__":
                 sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
                 sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
                 print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
+              elif args.dictFile:
+                dsid = line.rstrip().split('.')[1]
+                if int(dsid) in pointDict:
+                  xsec = pointDict[int(dsid)]
+                  filtEff = 1.0
+                  print('Found dataset',dsid,'with cross section',xsec,'and filter efficiency',filtEff)
+                  sh_all.setMetaString(line.rstrip().rstrip('/'),'dsid',dsid)
+                  sh_all.setMetaDouble(line.rstrip().rstrip('/'),'weight_xs',filtEff*xsec)
+                else:
+                  print('Dataset',dsid,'not found. Exiting')
+                  sys.exit(1)
         else:
           # Sample name
           sname='.'.join(os.path.basename(fname).split('.')[:-1]) # input filelist name without extension
