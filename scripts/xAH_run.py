@@ -93,7 +93,7 @@ parser.add_argument( '--isMC',     action="store_true", dest="is_MC",    default
 parser.add_argument( '--isAFII',   action="store_true", dest="is_AFII",  default=False, help="Running on AFII")
 parser.add_argument( '--xsec', dest='xsec', type = float, default = None, help = 'xsec*filtEff')
 parser.add_argument( '--AMI',dest='xsecFromAMI',action='store_true',help='If enabled, will query AMI for cross section, filter efficiency, and dsid')
-parser.add_argument( '--dict',dest='dictFile',type=str,help='get xsec from dictionary')
+parser.add_argument( '--dict',dest='dictFile',action='store_true',help='get xsec from dictionary')
 parser.add_argument('--dsidFromFileName',dest='dsidFromFileName',action='store_true',help='If enabled, will pull dsid from filename')
 parser.add_argument( '--dsid', dest='dsid', type = str, default = None, help = 'DSID')
 parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
