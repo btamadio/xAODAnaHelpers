@@ -95,7 +95,7 @@ parser.add_argument( '--xsec', dest='xsec', type = float, default = None, help =
 parser.add_argument( '--AMI',dest='xsecFromAMI',action='store_true',help='If enabled, will query AMI for cross section, filter efficiency, and dsid')
 parser.add_argument( '--dict',dest='dictFile',action='store_true',help='get xsec from dictionary')
 parser.add_argument('--dsidFromFileName',dest='dsidFromFileName',action='store_true',help='If enabled, will pull dsid from filename')
-parser.add_argument('--dsid', dest='dsid', type = str, default = None, help = 'DSID')
+parser.add_argument( '--dsid', dest='dsid', type = str, default = None, help = 'DSID')
 parser.add_argument('--noVtx',dest='no_vtx',action='store_true',default=False,help='Indicate that there is no primary vertex container')
 parser.add_argument('--inputList', dest='use_inputFileList', action='store_true', help='If enabled, will read in a text file containing a list of paths/filenames.')
 parser.add_argument('--inputTag', dest='inputTag', default="", help='A wildcarded name of input files to run on.')
