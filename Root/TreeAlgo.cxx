@@ -23,6 +23,7 @@ TreeAlgo :: TreeAlgo (std::string className) :
     m_trees({})
 {
   this->SetName("TreeAlgo"); // needed if you want to retrieve this algo with wk()->getAlg(ALG_NAME) downstream
+
   m_evtDetailStr            = "";
   m_trigDetailStr           = "";
   m_trigJetDetailStr        = "";
@@ -218,7 +219,6 @@ EL::StatusCode TreeAlgo :: execute ()
     std::string muSuffix("");
     std::string elSuffix("");
     std::string jetSuffix("");
-    std::string fatJetSuffix("");
     std::string photonSuffix("");
 
     /*
