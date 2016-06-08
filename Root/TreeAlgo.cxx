@@ -220,6 +220,7 @@ EL::StatusCode TreeAlgo :: execute ()
     std::string elSuffix("");
     std::string jetSuffix("");
     std::string photonSuffix("");
+    std::string fatJetSuffix("")|;
 
     /*
        if we find the systematic in the corresponding vector, we will use that container's systematic version instead of nominal version
