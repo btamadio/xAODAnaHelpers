@@ -221,7 +221,6 @@ EL::StatusCode TreeAlgo :: execute ()
     std::string jetSuffix("");
     std::string photonSuffix("");
     std::string fatJetSuffix("");
-
     /*
        if we find the systematic in the corresponding vector, we will use that container's systematic version instead of nominal version
         NB: since none of these contain the "" (nominal) case because of how I filter it, we handle the merging.. why?
