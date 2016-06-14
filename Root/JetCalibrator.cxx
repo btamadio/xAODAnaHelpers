@@ -506,11 +506,12 @@ EL::StatusCode JetCalibrator :: execute ()
 	for ( auto jet_itr : *(uncertCalibJetsSC.first) ) {
 	    if (m_applyFatJetPreSel) {
 	      bool validForJES = (jet_itr->pt() >= 150e3 && jet_itr->pt() < 3000e3);
-	      validForJES &= (jet_itr->m()/jet_itr->pt() >= 0 && jet_itr->m()/jet_itr->pt() < 0.8);
+	      validForJES &= (jet_itr->m()/jet_itr->pt() >= 0 && jet_itr->m()/jet_itr->pt() < 1.0);
 	      validForJES &= (fabs(jet_itr->eta()) < 2);
 	      if (!validForJES) continue;
 	    }
-	     if ( m_JESUncertTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
+	    //	     if ( m_JESUncertTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::Error ) {
+	    if ( m_JESUncertTool->applyCorrection( *jet_itr ) == CP::CorrectionCode::OutOfValidityRange){
               Error("execute()", "JetUncertaintiesTool reported a CP::CorrectionCode::Error");
               Error("execute()", "%s", m_name.c_str());
           }
