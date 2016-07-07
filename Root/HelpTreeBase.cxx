@@ -2546,11 +2546,11 @@ void HelpTreeBase::FillJet( const xAOD::Jet* jet_itr, const xAOD::Vertex* pv, in
 
     // light quark(1,2,3) , gluon (21 or 9), charm(4) and b(5)
     // GhostPartons should select for these pdgIds only
-    //    static SG::AuxElement::ConstAccessor< std::vector<const xAOD::TruthParticle*> > ghostPartons("GhostPartons");
-    //    if( ghostPartons.isAvailable( *jet_itr )) {
-    //    std::vector<const xAOD::TruthParticle*> truthPartons = ghostPartons( *jet_itr );
-
-    std::vector<const xAOD::TruthParticle*> truthPartons = jet_itr->getAssociatedObjects<xAOD::TruthParticle>("GhostPartons");
+    static SG::AuxElement::ConstAccessor< std::vector<const xAOD::TruthParticle*> > ghostPartons("GhostPartons");
+    if( ghostPartons.isAvailable( *jet_itr )) {
+      std::vector<const xAOD::TruthParticle*> truthPartons = ghostPartons( *jet_itr );
+    
+      //std::vector<const xAOD::TruthParticle*> truthPartons = jet_itr->getAssociatedObjects<xAOD::TruthParticle>("GhostPartons");
 
     if( truthPartons.size() == 0){
       thisJet->m_jet_truth_pdgId.push_back(-999);
@@ -2564,7 +2564,7 @@ void HelpTreeBase::FillJet( const xAOD::Jet* jet_itr, const xAOD::Vertex* pv, in
       thisJet->m_jet_truth_partonPt.push_back(truthPartons.at(iParent)->pt() / m_units);
       thisJet->m_jet_truth_partonDR.push_back(truthPartons.at(iParent)->p4().DeltaR( jet_itr->p4() ));
     }
-
+    }
   }
 
   if ( m_thisJetInfoSwitch[jetName]->m_charge ) {

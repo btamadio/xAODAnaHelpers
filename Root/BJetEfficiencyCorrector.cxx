@@ -53,7 +53,7 @@ BJetEfficiencyCorrector :: BJetEfficiencyCorrector (std::string className) :
   // configuration of the bjet eff tool
   m_corrFileName           = "$ROOTCOREBIN/data/xAODAnaHelpers/2015-PreRecomm-13TeV-MC12-CDI-October23_v1.root";
   m_jetAuthor              = "AntiKt4EMTopoJets";
-  m_taggerName             = "MV2c20";
+  m_taggerName             = "MV2c10";
   m_useDevelopmentFile     = true;
   m_coneFlavourLabel       = true;
 
