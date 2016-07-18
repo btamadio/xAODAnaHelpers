@@ -10,7 +10,6 @@
 #include "xAODCaloEvent/CaloClusterContainer.h"
 #include "xAODPrimitives/IsolationType.h"
 
-
 #include "TrigConfxAOD/xAODConfigTool.h"
 #include "TrigDecisionTool/TrigDecisionTool.h"
 
@@ -19,7 +18,8 @@
 #include <xAODAnaHelpers/HelpTreeBase.h>
 #include <xAODAnaHelpers/tools/ReturnCheck.h>
 
-
+#include "LHAPDF/LHAPDF.h"
+#include "LHAPDF/Reweighting.h"
 #include "AsgTools/StatusCode.h"
 
 // needed? should it be here?
@@ -41,7 +41,25 @@ HelpTreeBase::HelpTreeBase(xAOD::TEvent* event, TTree* tree, TFile* file, const 
   m_trigConfTool(nullptr),
   m_trigDecTool(nullptr)
 {
+  std::vector<std::string> pdfNames = {"NNPDF23_lo_as_0119_qed",
+				       "CT14nlo",
+				       "MMHT2014nlo68cl",
+				       "MMHT2014nlo68cl_nf4",
+				       "PDF4LHC15_nlo_100",
+				       "PDF4LHC15_nlo_30",
+				       "PDF4LHC15_nlo_mc",
+				       "CT10",
+				       "cteq66",
+				       "MSTW2008nlo68cl",
+				       "cteq6l1",
+				       "HERAPDF20_NLO_EIG",
+				       "HERAPDF20_NLO_VAR",
+				       "ATLAS-epWZ12-EIG",
+				       "ATLAS-epWZ12-VAR"};
 
+  for (auto pdfName : pdfNames){
+    m_pdfs.push_back(LHAPDF::mkPDF(pdfName+"/0"));
+  }
   m_units = units;
   m_debug = debug;
   m_DC14  = DC14;
@@ -172,8 +190,9 @@ void HelpTreeBase::AddEvent( const std::string detailStr ) {
     m_tree->Branch("pdfId2",            &m_pdfId2,        "pdfId2/I" );
     m_tree->Branch("x1",                &m_x1,            "x1/F"  );
     m_tree->Branch("x2",                &m_x2,            "x2/F"  );
+    m_tree->Branch("weight_pdf",&m_weight_pdf);
     //m_tree->Branch("scale",             &m_scale,         "scale/F");
-    //m_tree->Branch("q",                 &m_q,             "q/F");
+    m_tree->Branch("q",                 &m_q,             "q/F");
     //m_tree->Branch("pdf1",              &m_pdf1,          "pdf1/F");
     //m_tree->Branch("pdf2",              &m_pdf2,          "pdf2/F");
     m_tree->Branch("xf1",               &m_xf1,           "xf1/F");
@@ -294,6 +313,7 @@ void HelpTreeBase::FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* /*
     const xAOD::TruthEventContainer* truthE = 0;
     HelperFunctions::retrieve( truthE, "TruthEvents", m_event, 0 );
     if( truthE ) {
+      
       const xAOD::TruthEvent* truthEvent = truthE->at(0);
       truthEvent->pdfInfoParameter(m_pdgId1,   xAOD::TruthEvent::PDGID1);
       truthEvent->pdfInfoParameter(m_pdgId2,   xAOD::TruthEvent::PDGID2);
@@ -302,12 +322,14 @@ void HelpTreeBase::FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* /*
       truthEvent->pdfInfoParameter(m_x1,       xAOD::TruthEvent::X1);
       truthEvent->pdfInfoParameter(m_x2,       xAOD::TruthEvent::X2);
       //truthEvent->pdfInfoParameter(m_scale,    xAOD::TruthEvent::SCALE);
-      //truthEvent->pdfInfoParameter(m_q,        xAOD::TruthEvent::Q);
+      truthEvent->pdfInfoParameter(m_q,        xAOD::TruthEvent::Q);
       //truthEvent->pdfInfoParameter(m_pdf1,     xAOD::TruthEvent::PDF1);
       //truthEvent->pdfInfoParameter(m_pdf2,     xAOD::TruthEvent::PDF2);
       truthEvent->pdfInfoParameter(m_xf1,      xAOD::TruthEvent::XF1);
       truthEvent->pdfInfoParameter(m_xf2,      xAOD::TruthEvent::XF2);
-
+      for ( auto pdf : m_pdfs ){
+	m_weight_pdf.push_back(LHAPDF::weightxxQ(m_pdgId1,m_pdgId2,m_x1,m_x2,m_q,m_pdfs[0],pdf));
+      }
 //      // crashes because of q?`
 //        const xAOD::TruthEvent::PdfInfo info = truthEvent->pdfInfo();
 //        if( info.valid() ) {
@@ -3138,7 +3160,8 @@ void HelpTreeBase::ClearEvent() {
   m_pdgId1 = m_pdgId2 = m_pdfId1 = m_pdfId2 = -999;
   m_x1 = m_x2 = -999;
   m_xf1 = m_xf2 = -999;
-
+  m_weight_pdf.clear();
+  m_q=-999;
   //m_scale = m_q = m_pdf1 = m_pdf2 = -999;
 
   // CaloCluster

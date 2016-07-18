@@ -37,6 +37,10 @@
 #include "TTree.h"
 #include "TFile.h"
 
+namespace LHAPDF{
+  class PDF;
+}
+
 namespace TrigConf {
   class xAODConfigTool;
 }
@@ -238,6 +242,9 @@ protected:
   int m_pdfId2;
   float m_x1;
   float m_x2;
+  std::vector<LHAPDF::PDF*> m_pdfs;
+  std::vector<float> m_weight_pdf;
+
   //float m_scale;
   float m_q;
   //float m_pdf1;
