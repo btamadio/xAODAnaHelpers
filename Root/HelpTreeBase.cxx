@@ -44,18 +44,8 @@ HelpTreeBase::HelpTreeBase(xAOD::TEvent* event, TTree* tree, TFile* file, const 
   std::vector<std::string> pdfNames = {"NNPDF23_lo_as_0119_qed",
 				       "CT14nlo",
 				       "MMHT2014nlo68cl",
-				       "MMHT2014nlo68cl_nf4",
-				       "PDF4LHC15_nlo_100",
-				       "PDF4LHC15_nlo_30",
-				       "PDF4LHC15_nlo_mc",
-				       "CT10",
-				       "cteq66",
-				       "MSTW2008nlo68cl",
-				       "cteq6l1",
-				       "HERAPDF20_NLO_EIG",
-				       "HERAPDF20_NLO_VAR",
-				       "ATLAS-epWZ12-EIG",
-				       "ATLAS-epWZ12-VAR"};
+				       "NNPDF30_nnlo_as_0118",
+				       "NNPDF30_nlo_as_0118"};
 
   for (auto pdfName : pdfNames){
     m_pdfs.push_back(LHAPDF::mkPDF(pdfName+"/0"));
