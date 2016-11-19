@@ -22,6 +22,7 @@
 #include "xAODAnaHelpers/BJetEfficiencyCorrector.h"
 
 #include <xAODAnaHelpers/tools/ReturnCheck.h>
+#include "PathResolver/PathResolver.h"
 
 using HelperClasses::ToolName;
 
@@ -51,7 +52,7 @@ BJetEfficiencyCorrector :: BJetEfficiencyCorrector (std::string className) :
   m_outputSystName          = "BJetEfficiency_Algo";
 
   // configuration of the bjet eff tool
-  m_corrFileName           = "$ROOTCOREBIN/data/xAODAnaHelpers/2015-PreRecomm-13TeV-MC12-CDI-October23_v1.root";
+  m_corrFileName           = PathResolverFindCalibFile("xAODBTaggingEfficiency/13TeV/2016-20_7-13TeV-MC15-CDI-July12_v1.root");
   m_jetAuthor              = "AntiKt4EMTopoJets";
   m_taggerName             = "MV2c10";
   m_useDevelopmentFile     = true;
@@ -446,7 +447,7 @@ EL::StatusCode BJetEfficiencyCorrector :: executeEfficiencyCorrection(const xAOD
       //
       // Add decorator for decision
       //
-      SG::AuxElement::Decorator< int > isBTag( m_decor );
+      SG::AuxElement::Decorator< char > isBTag( m_decor );
       if( m_BJetSelectTool->accept( *jet_itr ) ) {
         isBTag( *jet_itr ) = 1;
         tagged = true;

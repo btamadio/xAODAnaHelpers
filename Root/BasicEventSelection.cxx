@@ -30,11 +30,11 @@ ClassImp(BasicEventSelection)
 
 BasicEventSelection :: BasicEventSelection (std::string className) :
     Algorithm(className),
-    m_PU_default_channel(0),
     m_grl(nullptr),
-    m_pileup_tool_handle("CP::PileupReweightingTool/PileupToolName", nullptr),
+    m_pileup_tool_handle("CP::PileupReweightingTool/Pileup"),
     m_trigConfTool(nullptr),
     m_trigDecTool(nullptr),
+    m_reweightSherpa22_tool_handle("PMGTools::PMGSherpa22VJetsWeightTool/ReweightSherpa22"),
     m_histEventCount(nullptr),
     m_cutflowHist(nullptr),
     m_cutflowHistW(nullptr),
@@ -46,6 +46,7 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
     m_tau_cutflowHist_1(nullptr),
     m_tau_cutflowHist_2(nullptr),
     m_jet_cutflowHist_1(nullptr),
+    m_trk_cutflowHist_1(nullptr),
     m_truth_cutflowHist_1(nullptr),
     m_duplicatesTree(nullptr)
 {
@@ -78,6 +79,7 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
 
   // GRL
   m_applyGRLCut = false;
+  // list of comma-separated grls
   m_GRLxml = "$ROOTCOREBIN/data/xAODAnaHelpers/data15_13TeV.periodAllYear_HEAD_DQDefects-00-01-02_PHYS_StandardGRL_Atlas_Ready.xml";
   //https://twiki.cern.ch/twiki/bin/viewauth/AtlasProtected/GoodRunListsForAnalysis
   m_GRLExcludeList = "";
@@ -85,12 +87,17 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
   // Clean Powheg huge weight
   m_cleanPowheg = false;
 
+  // Weight for Sherpa 2.2 samples
+  m_reweightSherpa22 = false;
+
   // Pileup Reweighting
   m_doPUreweighting    = false;
   m_lumiCalcFileNames  = "";
   m_PRWFileNames       = "";
-  m_PU_default_channel = 0;
 
+  // Data weight for unprescaling data
+  m_savePrescaleDataWeight  = false;
+  
   // Primary Vertex
   m_vertexContainerName = "PrimaryVertices";
   m_applyPrimaryVertexCut = false;
@@ -102,6 +109,7 @@ BasicEventSelection :: BasicEventSelection (std::string className) :
   m_applyCoreFlagsCut     = false;
 
   // Trigger
+  m_extraTriggerSelection = "";
   m_triggerSelection = "";
   m_applyTriggerCut = false;
   m_storeTrigDecisions = false;
@@ -135,7 +143,7 @@ EL::StatusCode BasicEventSelection :: setupJob (EL::Job& job)
 
   EL::OutputStream outForMetadata(m_metaDataStreamName);
   if(!job.outputHas(m_metaDataStreamName) ){ job.outputAdd ( outForMetadata ); }
-  
+
   EL::OutputStream outForDuplicates(m_duplicatesStreamName);
   if(!job.outputHas(m_duplicatesStreamName) ){ job.outputAdd ( outForDuplicates ); }
 
@@ -235,7 +243,7 @@ EL::StatusCode BasicEventSelection :: fileExecute ()
 		  break;
 	      }
 	  }
-	  if ( !allFromUnknownStream ) { Warning("fileExecute()","Found incomplete Bookkeepers from stream: %s ! Check input file for potential corruption...", stream.c_str() ); }
+	  if ( !allFromUnknownStream ) { Warning("fileExecute()","Found incomplete CBK from stream: %s. This is not necessarily a sign of file corruption (incomplete CBK appear when 'maxevents' is set in the AOD jo, for instance), but you may still want to check input file for potential corruption...", stream.c_str() ); }
 
       }
 
@@ -277,7 +285,7 @@ EL::StatusCode BasicEventSelection :: fileExecute ()
       m_MD_initialSumW	      = allEventsCBK->sumOfEventWeights();
       m_MD_initialSumWSquared = allEventsCBK->sumOfEventWeightsSquared();
 
-      if ( !DxAODEventsCBK ) {
+      if ( m_isDerivation && !DxAODEventsCBK ) {
         Error("fileExecute()", "No CutBookkeeper corresponds to the selected Derivation Framework algorithm name. Check it with your DF experts! Aborting.");
         return EL::StatusCode::FAILURE;
       }
@@ -335,7 +343,8 @@ EL::StatusCode BasicEventSelection :: initialize ()
   // if truth level make sure parameters are set properly
   if( m_truthLevelOnly ) {
     Info("initialize()", "Truth only! Turn off trigger stuff");
-    m_triggerSelection = "";
+    m_triggerSelection      = "";
+    m_extraTriggerSelection = "";
     m_applyTriggerCut = m_storeTrigDecisions = m_storePassL1 = m_storePassHLT = m_storeTrigKeys = false;
     Info("initialize()", "Truth only! Turn off GRL");
     m_applyGRLCut = false;
@@ -364,6 +373,42 @@ EL::StatusCode BasicEventSelection :: initialize ()
     m_cleanPowheg = true;
     Info("initialize()", "This is J5 Powheg - cleaning that nasty huge weight event");
   }
+
+  //////// Initialize Tool for Sherpa 2.2 Reweighting ////////////
+  // https://twiki.cern.ch/twiki/bin/viewauth/AtlasProtected/CentralMC15ProductionList#Sherpa_v2_2_0_V_jets_NJet_reweig
+  m_reweightSherpa22 = false;
+  if( m_isMC && 
+      ( (eventInfo->mcChannelNumber() >= 363331 && eventInfo->mcChannelNumber() <= 363483 ) ||
+        (eventInfo->mcChannelNumber() >= 363102 && eventInfo->mcChannelNumber() <= 363122 ) ||
+        (eventInfo->mcChannelNumber() >= 363361 && eventInfo->mcChannelNumber() <= 363435 ) ) ){
+    Info("initialize()", "This is Sherpa 2.2 dataset and should be reweighted.  An extra weight will be saved to EventInfo called \"weight_Sherpa22\".");
+    m_reweightSherpa22 = true;
+
+    //Choose Jet Truth container, WZ has more information and is favored by the tool
+    std::string pmg_TruthJetContainer = "";
+    if( m_event->contains<xAOD::JetContainer>("AntiKt4TruthWZJets") ){
+      pmg_TruthJetContainer = "AntiKt4TruthWZJets";
+    } else if( m_event->contains<xAOD::JetContainer>("AntiKt4TruthJets") ){
+      pmg_TruthJetContainer = "AntiKt4TruthJets";
+    } else {
+      Warning("initialize()", "No Truth Jet Container found for Sherpa 22 reweighting, weight_Sherpa22 will not be set.");
+      m_reweightSherpa22 = false;
+    }
+
+    //Initialize Tool
+    if( m_reweightSherpa22 ){
+
+      if (!m_reweightSherpa22_tool_handle.isUserConfigured()) {
+
+        RETURN_CHECK("BasicEventSelection::initialize()", checkToolStore<PMGTools::PMGSherpa22VJetsWeightTool>("ReweightSherpa22"), "Failed to check whether tool already exists in asg::ToolStore" );
+        RETURN_CHECK( "initialize()", ASG_MAKE_ANA_TOOL(m_reweightSherpa22_tool_handle, PMGTools::PMGSherpa22VJetsWeightTool), "Could not make the tool");
+        RETURN_CHECK( "initialize()", m_reweightSherpa22_tool_handle.setProperty( "TruthJetContainer", pmg_TruthJetContainer ), "Failed to set TruthJetContainer" );
+        RETURN_CHECK( "initialize()", m_reweightSherpa22_tool_handle.retrieve(), "Failed to properly retrieve PMGTools::PMGSherpa22VJetsWeightTool");
+
+      }
+    }
+  }//if isMC and a Sherpa 2.2 sample
+
 
   Info("initialize()", "Setting up histograms");
 
@@ -404,6 +449,8 @@ EL::StatusCode BasicEventSelection :: initialize ()
   m_tau_cutflowHist_2->SetCanExtend(TH1::kAllAxes);
   m_jet_cutflowHist_1    = new TH1D("cutflow_jets_1", "cutflow_jets_1", 1, 1, 2);
   m_jet_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
+  m_trk_cutflowHist_1    = new TH1D("cutflow_trks_1", "cutflow_trks_1", 1, 1, 2);
+  m_trk_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
   m_truth_cutflowHist_1  = new TH1D("cutflow_truths_1", "cutflow_truths_1", 1, 1, 2);
   m_truth_cutflowHist_1->SetCanExtend(TH1::kAllAxes);
 
@@ -416,7 +463,7 @@ EL::StatusCode BasicEventSelection :: initialize ()
     m_cutflow_duplicates  = m_cutflowHist->GetXaxis()->FindBin("Duplicates");
     m_cutflowHistW->GetXaxis()->FindBin("Duplicates");
   }
-  
+
   if ( !m_isMC ) {
     if ( m_applyGRLCut ) {
       m_cutflow_grl  = m_cutflowHist->GetXaxis()->FindBin("GRL");
@@ -437,20 +484,20 @@ EL::StatusCode BasicEventSelection :: initialize ()
     m_cutflow_trigger  = m_cutflowHist->GetXaxis()->FindBin("Trigger");
     m_cutflowHistW->GetXaxis()->FindBin("Trigger");
   }
-  
+
   // -------------------------------------------------------------------------------------------------
-  
+
   // Create TTree for bookeeeping duplicated events
   //
   TFile *fileDPL = wk()->getOutputFile (m_duplicatesStreamName);
   fileDPL->cd();
-  
+
   m_duplicatesTree = new TTree("duplicates","Info on duplicated events");
   m_duplicatesTree->Branch("runNumber",    &m_duplRunNumber,      "runNumber/I");
   m_duplicatesTree->Branch("eventNumber",  &m_duplEventNumber,    "eventNumber/LI");
-  
+
   // -------------------------------------------------------------------------------------------------
-  
+
   Info("initialize()", "Setting Up Tools");
 
   // 1.
@@ -461,7 +508,11 @@ EL::StatusCode BasicEventSelection :: initialize ()
     m_grl = new GoodRunsListSelectionTool("GoodRunsListSelectionTool");
     std::vector<std::string> vecStringGRL;
     m_GRLxml = gSystem->ExpandPathName( m_GRLxml.c_str() );
-    vecStringGRL.push_back(m_GRLxml);
+
+    std::string grl;
+    std::istringstream ss(m_GRLxml);
+    while ( std::getline(ss, grl, ',') ) vecStringGRL.push_back(grl);
+
     RETURN_CHECK("BasicEventSelection::initialize()", m_grl->setProperty( "GoodRunsListVec", vecStringGRL), "");
     RETURN_CHECK("BasicEventSelection::initialize()", m_grl->setProperty("PassThrough", false), "");
     RETURN_CHECK("BasicEventSelection::initialize()", m_grl->initialize(), "");
@@ -512,26 +563,40 @@ EL::StatusCode BasicEventSelection :: initialize ()
       printf( "\t %s \n", lumiCalcFiles.at(i).c_str() );
     }
 
-    RETURN_CHECK("BasicEventSelection::initialize()", checkToolStore<CP::PileupReweightingTool>("Pileup"), "" );
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.makeNew<CP::PileupReweightingTool>("CP::PileupReweightingTool/Pileup"), "Failed to create handle to CP::PileupReweightingTool");
+    //RETURN_CHECK("BasicEventSelection::initialize()", checkToolStore<CP::PileupReweightingTool>("Pileup"), "Failed to check whether tool already exists in asg::ToolStore" );
+    ////RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.makeNew<CP::PileupReweightingTool>("CP::PileupReweightingTool/Pileup"), "Failed to create handle to CP::PileupReweightingTool");
+    //RETURN_CHECK("initialize()", ASG_MAKE_ANA_TOOL(m_pileup_tool_handle, CP::PileupReweightingTool), "Could not make the tool");
+    //
+
+    //tmp jeff
+    ASG_SET_ANA_TOOL_TYPE(m_pileup_tool_handle, CP::PileupReweightingTool);
+    m_pileup_tool_handle.setName("Pileup");
+
+
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("ConfigFiles", PRWFiles), "");
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("LumiCalcFiles", lumiCalcFiles), "");
-    if ( m_PU_default_channel ) {
-      RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DefaultChannel", m_PU_default_channel), "");
-    }
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactor", 1.0/1.16), "Failed to set pileup reweighting data scale factor");
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactor", 1.0/1.09), "Failed to set pileup reweighting data scale factor");
     RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorUP", 1.0), "Failed to set pileup reweighting data scale factor up");
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorDOWN", 1.0/1.23), "Failed to set pileup reweighting data scale factor down");
-    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.initialize(), "Failed to properly initialize CP::PileupReweightingTool");
-    //m_pileup_tool_handle->EnableDebugging(true);
+    RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.setProperty("DataScaleFactorDOWN", 1.0/1.18), "Failed to set pileup reweighting data scale factor down");
+    // RETURN_CHECK("BasicEventSelection::initialize()", m_pileup_tool_handle.initialize(), "Failed to properly initialize CP::PileupReweightingTool");
+    RETURN_CHECK("BasicEventSelection::retrieve()", m_pileup_tool_handle.retrieve(), "Failed to properly retrieve CP::PileupReweightingTool");
+//    RETURN_CHECK("BasicEventSelection::retrieve()", asg::ToolStore::put(m_pileup_tool_handle.get()), "Failed to put");
 
   }
-
+  
+  // pileup reweighing tool is needed to get the data weight for unprescaling  
+  if ( m_savePrescaleDataWeight && !m_doPUreweighting) {
+    
+    Error("initialize()", "m_savePrescaleDataWeight is true but m_doPUreweighting is false !!!");
+    return EL::StatusCode::FAILURE;
+  
+  } 
+  
   // 3.
   // initialize the Trig::TrigDecisionTool
   //
-
-  if( !m_triggerSelection.empty() || m_applyTriggerCut || m_storeTrigDecisions || m_storePassL1 || m_storePassHLT || m_storeTrigKeys ) {
+  if( !m_triggerSelection.empty() || !m_extraTriggerSelection.empty() || 
+      m_applyTriggerCut || m_storeTrigDecisions || m_storePassL1 || m_storePassHLT || m_storeTrigKeys ) {
 
     //if it's there, it must be already configured
     if ( asg::ToolStore::contains<Trig::TrigDecisionTool>( "TrigDecisionTool" ) && asg::ToolStore::contains<TrigConf::xAODConfigTool>("xAODConfigTool")) {
@@ -561,7 +626,7 @@ EL::StatusCode BasicEventSelection :: initialize ()
   // As a check, let's see the number of events in our file (long long int)
   //
   Info("initialize()", "Number of events in file = %lli", m_event->getEntries());
-  
+
   // Initialize counter for number of entries
   m_eventCounter   = 0;
 
@@ -594,17 +659,37 @@ EL::StatusCode BasicEventSelection :: execute ()
 
   //-----------------------------------------
   // Print triggers used for first entry only
+  // and fill the trigger expression for 
+  // unprescaling data
   //-----------------------------------------
-  if ( m_eventCounter == 0 && !m_triggerSelection.empty() ) {
-    Info("execute()", "*** Triggers used (in OR) are:\n");
-    auto printingTriggerChainGroup = m_trigDecTool->getChainGroup(m_triggerSelection);
+  
+  std::string TriggerExpression = ""; 
+
+  if ( !m_triggerSelection.empty() ) {
+    if (m_eventCounter == 0 || m_savePrescaleDataWeight) {
+      if (m_eventCounter == 0) Info("execute()", "*** Triggers used (in OR) are:\n");
+      auto printingTriggerChainGroup = m_trigDecTool->getChainGroup(m_triggerSelection);
+      std::vector<std::string> triggersUsed = printingTriggerChainGroup->getListOfTriggers();
+      for ( unsigned int iTrigger = 0; iTrigger < triggersUsed.size(); ++iTrigger ) {
+        if (m_eventCounter == 0) printf("    %s\n", triggersUsed.at(iTrigger).c_str());
+        TriggerExpression.append(triggersUsed.at(iTrigger).c_str());
+        if ( iTrigger != triggersUsed.size() - 1) TriggerExpression.append(" || ");
+      }
+    }
+  }
+
+  if ( m_eventCounter == 0 && !m_extraTriggerSelection.empty() ) {
+    Info("execute()", "*** Extra Trigger Info Saved are :\n");
+    auto printingTriggerChainGroup = m_trigDecTool->getChainGroup(m_extraTriggerSelection);
     std::vector<std::string> triggersUsed = printingTriggerChainGroup->getListOfTriggers();
     for ( unsigned int iTrigger = 0; iTrigger < triggersUsed.size(); ++iTrigger ) {
       printf("    %s\n", triggersUsed.at(iTrigger).c_str());
     }
     printf("\n");
-  }  
-  
+  }
+
+
+
   ++m_eventCounter;
 
   //------------------
@@ -632,12 +717,12 @@ EL::StatusCode BasicEventSelection :: execute ()
 
       // kill the powheg event with a huge weight
       if( m_cleanPowheg ) {
-	if( eventInfo->eventNumber() == 1652845 ) {
-	  Info("execute()","Dropping huge weight event. Weight should be 352220000");
-	  Info("execute()","WEIGHT : %f ", mcEvtWeight);
-	  wk()->skipEvent();
-	  return EL::StatusCode::SUCCESS; // go to next event
-	}
+        if( eventInfo->eventNumber() == 1652845 ) {
+          Info("execute()","Dropping huge weight event. Weight should be 352220000");
+          Info("execute()","WEIGHT : %f ", mcEvtWeight);
+          wk()->skipEvent();
+          return EL::StatusCode::SUCCESS; // go to next event
+        }
       }
     }
     // Decorate event with the *total* MC event weight
@@ -646,7 +731,53 @@ EL::StatusCode BasicEventSelection :: execute ()
   } else {
     mcEvtWeight = mcEvtWeightAcc(*eventInfo);
   }
+
+  //------------------------------------------------------------------------------------------
+  // Declare an 'eventInfo' decorator with prescale weight for unprescaling data
+  // https://cds.cern.ch/record/2014726/files/ATL-COM-SOFT-2015-119.pdf (line 130)
+  //------------------------------------------------------------------------------------------
   
+  static SG::AuxElement::Decorator< float > prsc_DataWeightDecor("prescale_DataWeight");
+  static SG::AuxElement::Accessor< float >  prsc_DataWeightAcc("prescale_DataWeight");
+
+  float prsc_DataWeight(1.0);
+  
+  // Check if need to create xAH event weight
+  //
+  if ( !prsc_DataWeightDecor.isAvailable(*eventInfo) ) {
+    if ( !m_isMC && m_savePrescaleDataWeight ) {
+      
+      // get mu dependent data weight
+      prsc_DataWeight = m_pileup_tool_handle->getDataWeight( *eventInfo, TriggerExpression, true );
+    }
+    
+    // Decorate event with the *total* MC event weight
+    //
+    prsc_DataWeightDecor(*eventInfo) = prsc_DataWeight;
+  } else {
+    prsc_DataWeight = prsc_DataWeightAcc(*eventInfo);
+  }
+
+
+  //------------------------------------------------------------------------------------------
+  // Declare an 'eventInfo' decorator with the Sherpa 2.2 reweight to multijet truth
+  // https://twiki.cern.ch/twiki/bin/viewauth/AtlasProtected/CentralMC15ProductionList#Sherpa_v2_2_0_V_jets_NJet_reweig
+  //------------------------------------------------------------------------------------------
+  
+  if ( m_reweightSherpa22 ){
+    static SG::AuxElement::Decorator< float > weight_Sherpa22Decor("weight_Sherpa22");
+    // Check if weight needs to be added
+    if ( !weight_Sherpa22Decor.isAvailable(*eventInfo) ) {
+
+      float weight_Sherpa22 = -999.;
+      weight_Sherpa22 = m_reweightSherpa22_tool_handle->getWeight();
+      weight_Sherpa22Decor( *eventInfo ) = weight_Sherpa22;
+      if( m_debug)  Info("exectue()","Setting Sherpa 2.2 reweight to %f", weight_Sherpa22);
+
+    } // If not already decorated
+  } // if m_reweightSherpa22
+
+
   //------------------------------------------------------------------------------------------
   // Fill initial bin of cutflow
   //------------------------------------------------------------------------------------------
@@ -670,29 +801,29 @@ EL::StatusCode BasicEventSelection :: execute ()
   //--------------------------------------------------------------------------------------------------------
 
   if ( ( !m_isMC && m_checkDuplicatesData ) || ( m_isMC && m_checkDuplicatesMC ) ) {
-    
+
     std::pair<uint32_t,uint32_t> thispair = std::make_pair(eventInfo->runNumber(),eventInfo->eventNumber());
-    
+
     if ( m_RunNr_VS_EvtNr.find(thispair) != m_RunNr_VS_EvtNr.end() ) {
-      
+
       if ( m_debug ) { Warning("execute()","Found duplicated event! runNumber = %u, eventNumber = %u. Skipping this event", static_cast<uint32_t>(eventInfo->runNumber()),static_cast<uint32_t>(eventInfo->eventNumber()) ); }
-      
+
       // Bookkeep info in duplicates TTree
       //
       m_duplRunNumber   = eventInfo->runNumber();
       m_duplEventNumber = eventInfo->eventNumber();
-      
+
       m_duplicatesTree->Fill();
-      
+
       wk()->skipEvent();
       return EL::StatusCode::SUCCESS; // go to next event
     }
-    
+
     m_RunNr_VS_EvtNr.insert(thispair);
-  
+
     m_cutflowHist ->Fill( m_cutflow_duplicates, 1 );
     m_cutflowHistW->Fill( m_cutflow_duplicates, mcEvtWeight);
-  
+
   }
 
   //------------------------------------------------------------------------------------------
@@ -808,20 +939,48 @@ EL::StatusCode BasicEventSelection :: execute ()
     //
     if ( m_storeTrigDecisions ) {
 
-      std::vector<std::string> passTriggers;
-      std::vector<float> triggerPrescales;
+      std::vector<std::string>  passTriggers;
+      std::vector<float>        triggerPrescales;
+      std::vector<std::string>  isPassedBitsNames;
+      std::vector<unsigned int> isPassedBits;
 
+      // Save info for the triggers used to skim events
+      //
       for ( auto &trigName : triggerChainGroup->getListOfTriggers() ) {
         auto trigChain = m_trigDecTool->getChainGroup( trigName );
         if ( trigChain->isPassed() ) {
           passTriggers.push_back( trigName );
           triggerPrescales.push_back( trigChain->getPrescale() );
         }
+	isPassedBitsNames.push_back( trigName );
+	isPassedBits     .push_back( m_trigDecTool->isPassedBits(trigName) );
       }
-      static SG::AuxElement::Decorator< std::vector< std::string > > passTrigs("passTriggers");
+      
+      // Save info for extra triggers
+      //
+      if ( !m_extraTriggerSelection.empty() ) {
+
+	auto extraTriggerChainGroup = m_trigDecTool->getChainGroup(m_extraTriggerSelection);
+
+	for ( auto &trigName : extraTriggerChainGroup->getListOfTriggers() ) {
+	  auto trigChain = m_trigDecTool->getChainGroup( trigName );
+	  if ( trigChain->isPassed() ) {
+	    passTriggers.push_back( trigName );
+	    triggerPrescales.push_back( trigChain->getPrescale() );
+	  }
+	  isPassedBitsNames.push_back( trigName );
+	  isPassedBits     .push_back( m_trigDecTool->isPassedBits(trigName) );
+	}
+      }
+
+      static SG::AuxElement::Decorator< std::vector< std::string > >  passTrigs("passTriggers");
       passTrigs( *eventInfo ) = passTriggers;
-      static SG::AuxElement::Decorator< std::vector< float > > trigPrescales("triggerPrescales");
+      static SG::AuxElement::Decorator< std::vector< float > >        trigPrescales("triggerPrescales");
       trigPrescales( *eventInfo ) = triggerPrescales;
+      static SG::AuxElement::Decorator< std::vector< unsigned int > > isPassBits("isPassedBits");
+      isPassBits( *eventInfo ) = isPassedBits;
+      static SG::AuxElement::Decorator< std::vector< std::string > >  isPassBitsNames("isPassedBitsNames");
+      isPassBitsNames( *eventInfo ) = isPassedBitsNames;
 
     }
 

@@ -16,8 +16,6 @@
 #include "TH1D.h"
 
 // external tools include(s):
-#include "IsolationSelection/IsolationSelectionTool.h"
-#include "MuonSelectorTools/MuonSelectionTool.h"
 #include "AsgTools/AnaToolHandle.h"
 
 // algorithm wrapper
@@ -25,7 +23,13 @@
 
 namespace Trig {
   class TrigDecisionTool;
-  //class TrigMuonMatching;
+  class IMatchingTool;
+}
+
+namespace CP {
+  class IMuonSelectionTool;
+  //class IIsolationSelectionTool;
+  class IsolationSelectionTool;
 }
 
 class MuonSelector : public xAH::Algorithm
@@ -59,6 +63,11 @@ public:
   float          m_d0sig_max; 	             /* require d0 significance (at BL) < m_d0sig_max */
   float	         m_z0sintheta_max;           /* require z0*sin(theta) (at BL - corrected with vertex info) < m_z0sintheta_max */
 
+  /** @brief Remove cosmic muons that fail absolute z0 and d0 selections */
+  bool           m_removeCosmicMuon;
+  /** @brief Remove events with a bad muon, defined by poor q/p */
+  bool           m_removeEventBadMuon;
+
   // isolation
   std::string    m_MinIsoWPCut;              /* reject objects which do not pass this isolation cut - default = "" (no cut) */
   std::string    m_IsoWPList;                /* decorate objects with 'isIsolated_*' flag for each WP in this input list - default = all current ASG WPs */
@@ -72,7 +81,7 @@ public:
   		                                If left empty (as it is by default), no trigger matching will be attempted at all */
   std::string    m_diMuTrigChains;           /* A comma-separated string w/ alll the HLT dimuon trigger chains for which you want to perform the matching.
   					     	If left empty (as it is by default), no trigger matching will be attempted at all */
-  float          m_minDeltaR;
+  double         m_minDeltaR;
 
   std::string    m_passAuxDecorKeys;
   std::string    m_failAuxDecorKeys;
@@ -105,6 +114,7 @@ private:
   int   m_mu_cutflow_d0_cut;		    //!
   int   m_mu_cutflow_d0sig_cut;  	    //!
   int   m_mu_cutflow_iso_cut;		    //!
+  int   m_mu_cutflow_cosmic_cut;		    //!
 
   std::vector<std::string> m_IsoKeys;       //!
 
@@ -113,16 +123,16 @@ private:
   std::vector<std::string>            m_singleMuTrigChainsList; //!  /* contains all the HLT trigger chains tokens extracted from m_singleMuTrigChains */
   std::vector<std::string>            m_diMuTrigChainsList;     //!  /* contains all the HLT trigger chains tokens extracted from m_diMuTrigChains */
 
-
   // tools
 
-  asg::AnaToolHandle<CP::IsolationSelectionTool>  m_isolationSelectionTool_handle; //!
-  std::string m_isolationSelectionTool_name;                                       //!
-  asg::AnaToolHandle<CP::IMuonSelectionTool>      m_muonSelectionTool_handle;      //!
-  std::string m_muonSelectionTool_name;                                            //!
-  Trig::TrigDecisionTool*                         m_trigDecTool;                   //!
-  //asg::AnaToolHandle<Trig::TrigMuonMatching>      m_trigMuonMatchTool_handle;      //!
-  //std::string m_trigMuonMatchTool_name;                                            //!
+  //asg::AnaToolHandle<CP::IIsolationSelectionTool>  m_isolationSelectionTool_handle;  //!
+  asg::AnaToolHandle<CP::IsolationSelectionTool>  m_isolationSelectionTool_handle;  //!
+  std::string m_isolationSelectionTool_name;                                         //!
+  asg::AnaToolHandle<CP::IMuonSelectionTool>       m_muonSelectionTool_handle;       //!
+  std::string m_muonSelectionTool_name;                                              //!
+  Trig::TrigDecisionTool*                          m_trigDecTool;                    //!
+  asg::AnaToolHandle<Trig::IMatchingTool>          m_trigMuonMatchTool_handle;       //!
+  std::string m_trigMuonMatchTool_name;                                              //!
   bool m_doTrigMatch;
 
   // variables that don't get filled at submission time should be

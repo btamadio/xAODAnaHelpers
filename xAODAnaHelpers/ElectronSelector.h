@@ -25,10 +25,9 @@
 // algorithm wrapper
 #include "xAODAnaHelpers/Algorithm.h"
 
-
 namespace Trig {
   class TrigDecisionTool;
-  //class TrigEgammaMatchingTool;
+  class MatchingTool;
 }
 
 class ElectronSelector : public xAH::Algorithm
@@ -67,21 +66,29 @@ public:
   float	     	 m_z0sintheta_max;	     /* require z0*sin(theta) (at BL - corrected with vertex info) < m_z0sintheta_max */
   bool           m_doAuthorCut;
   bool           m_doOQCut;
+
+  ///// electron PID /////
+
+  /** @brief To read electron PID decision from DAOD, rather than recalculate with tool */
+  bool           m_readIDFlagsFromDerivation;
+  /** @brief Performs the Likelihood PID B-Layer cut locally.
+   * @note Occurs automatically only if :cpp:member:`xAH::ElectronSelector::m_LHOperatingPoint` is LooseBL and :cpp:member:`xAH::ElectronSelector::m_readIDFlagsFromDerivation`` is true */
   bool           m_doBLTrackQualityCut;
 
-  /* electron PID */
-
-  bool           m_readIDFlagsFromDerivation;
-  std::string    m_confDirPID;
-
-  /* likelihood-based  */
+  //// likelihood-based  ////
+  /** @brief Instantiate and perform the electron Likelihood PID */
+  bool           m_doLHPID;
+  /** @brief Cut on electron Likelihood PID */
   bool           m_doLHPIDcut;
-  std::string    m_LHConfigYear;
+  /** @brief Loosest Likelihood PID operating point to save */
   std::string    m_LHOperatingPoint;
 
-  /* cut-based */
+  //// cut-based ////
+  /** @brief Instantiate and perform the electron cut-based PID */
+  bool           m_doCutBasedPID;
+  /** @brief Cut on electron cut-based PID */
   bool           m_doCutBasedPIDcut;
-  std::string    m_CutBasedConfigYear;
+  /** @brief Loosest cut-based PID operating point to save */
   std::string    m_CutBasedOperatingPoint;
 
   /* isolation */
@@ -95,9 +102,13 @@ public:
 
   /* trigger matching */
 
-  std::string    m_ElTrigChains;   /* A comma-separated string w/ alll the HLT electron trigger chains for which you want to perform the matching.
-  				      This is passed by the user as input in configuration
-				      If left empty (as it is by default), no trigger matching will be attempted at all */
+  std::string    m_singleElTrigChains;   /* A comma-separated string w/ alll the HLT single electron trigger chains for which you want to perform the matching.
+  			      	            This is passed by the user as input in configuration
+				            If left empty (as it is by default), no trigger matching will be attempted at all */
+  std::string    m_diElTrigChains;       /* A comma-separated string w/ alll the HLT di-electron trigger chains for which you want to perform the matching.
+  			   	            This is passed by the user as input in configuration
+			                    If left empty (as it is by default), no trigger matching will be attempted at all */
+  double         m_minDeltaR;
 
 private:
 
@@ -141,16 +152,17 @@ private:
   std::string m_isolationSelectionTool_name;                                      //!
 
   /* PID manager(s) */
-  ElectronLHPIDManager*            m_el_LH_PIDManager;       //!
-  ElectronCutBasedPIDManager*      m_el_CutBased_PIDManager; //!
-  Trig::TrigDecisionTool*          m_trigDecTool;            //!
-  //asg::AnaToolHandle<Trig::TrigEgammaMatchingTool>  m_trigElMatchTool_handle; //!
-  //std::string m_trigElMatchTool_name;    //!
+  ElectronLHPIDManager*                    m_el_LH_PIDManager;        //!
+  ElectronCutBasedPIDManager*              m_el_CutBased_PIDManager;  //!
+  Trig::TrigDecisionTool*                  m_trigDecTool;             //!
+  asg::AnaToolHandle<Trig::MatchingTool>   m_trigElectronMatchTool_handle;  //!
+  std::string m_trigElMatchTool_name;                                 //!
   bool m_doTrigMatch;
 
   /* other private members */
 
-  std::vector<std::string>            m_ElTrigChainsList; //!  /* contains all the HLT trigger chains tokens extracted from m_ElTrigChains */
+  std::vector<std::string>            m_singleElTrigChainsList;  //!  /* contains all the HLT trigger chains tokens extracted from m_singleElTrigChains */
+  std::vector<std::string>            m_diElTrigChainsList;      //!  /* contains all the HLT trigger chains tokens extracted from m_diElTrigChains */
 
 public:
 

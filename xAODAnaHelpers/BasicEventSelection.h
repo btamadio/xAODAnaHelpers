@@ -18,6 +18,7 @@
 #include "GoodRunsLists/GoodRunsListSelectionTool.h"
 #include "PileupReweighting/PileupReweightingTool.h"
 #include "AsgTools/AnaToolHandle.h"
+#include "PMGTools/PMGSherpa22VJetsWeightTool.h"
 
 // algorithm wrapper
 #include "xAODAnaHelpers/Algorithm.h"
@@ -47,11 +48,16 @@ class BasicEventSelection : public xAH::Algorithm
     // Clean Powheg huge weight
     bool m_cleanPowheg;
 
+    // Reweight Sherpa 2.2 Samples
+    bool  m_reweightSherpa22;
+
     //PU Reweighting
     bool m_doPUreweighting;
     std::string m_lumiCalcFileNames;
     std::string m_PRWFileNames;
-    int m_PU_default_channel;
+
+    // Unprescaling data
+    bool m_savePrescaleDataWeight;
 
     // Primary Vertex
     std::string m_vertexContainerName;
@@ -63,7 +69,16 @@ class BasicEventSelection : public xAH::Algorithm
     bool m_applyCoreFlagsCut;
 
     // Trigger
+    /**
+       @brief Decisions of Triggers listed in m_triggerSelection are saved and cut on depending on m_applyTriggerCut
+    */
     std::string m_triggerSelection;
+
+    /**
+       @brief Decisions of Triggers listed in m_extraTriggerSelection are saved but not cut on
+    */
+    std::string m_extraTriggerSelection;
+
     bool m_applyTriggerCut;
     bool m_storeTrigDecisions;
     bool m_storePassL1;
@@ -97,6 +112,8 @@ class BasicEventSelection : public xAH::Algorithm
     asg::AnaToolHandle<CP::IPileupReweightingTool>   m_pileup_tool_handle; //!
     TrigConf::xAODConfigTool*    m_trigConfTool;  //!
     Trig::TrigDecisionTool*      m_trigDecTool;   //!
+
+    asg::AnaToolHandle<IWeightTool> m_reweightSherpa22_tool_handle; //!
 
     bool m_isMC;      //!
 
@@ -133,6 +150,7 @@ class BasicEventSelection : public xAH::Algorithm
     TH1D* m_tau_cutflowHist_1;   //!
     TH1D* m_tau_cutflowHist_2;   //!
     TH1D* m_jet_cutflowHist_1;   //!
+    TH1D* m_trk_cutflowHist_1;   //!
     TH1D* m_truth_cutflowHist_1; //!
 
     /** TTree for duplicates bookeeping */

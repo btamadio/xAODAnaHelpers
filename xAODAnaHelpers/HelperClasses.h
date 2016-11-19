@@ -29,16 +29,14 @@ namespace HelperClasses {
       PHOTONSELECTOR,
       JETSELECTOR,
       BJETSELECTOR,
-      OVERLAPREMOVER,
       CALIBRATOR,
       CORRECTOR,
       SELECTOR,
       DEFAULT
   };
 
-  /* template enum parser
-  copied from: http://stackoverflow.com/a/726681
-  */
+  /** template enum parser. Copied from: http://stackoverflow.com/a/726681
+   */
   template <typename T>
   class EnumParser
   {
@@ -137,6 +135,7 @@ namespace HelperClasses {
         m_truth          truth          exact
         m_caloClus       caloClusters   exact
         ================ ============== =======
+
     @endrst
    */
   class EventInfoSwitch : public InfoSwitch {
@@ -162,7 +161,9 @@ namespace HelperClasses {
         m_basic        basic        exact
         m_menuKeys     menuKeys     exact
         m_passTriggers passTriggers exact
+        m_passTrigBits passTrigBits exact
         ============== ============ =======
+
     @endrst
    */
   class TriggerInfoSwitch : public InfoSwitch {
@@ -170,6 +171,7 @@ namespace HelperClasses {
     bool m_basic;
     bool m_menuKeys;
     bool m_passTriggers;
+    bool m_passTrigBits;
     TriggerInfoSwitch(const std::string configStr) : InfoSwitch(configStr) { initialize(); };
   protected:
     void initialize();
@@ -185,6 +187,7 @@ namespace HelperClasses {
         m_kinematic    kinematic    exact
         m_clean        clean        exact
         ============== ============ =======
+
     @endrst
    */
 
@@ -216,6 +219,7 @@ namespace HelperClasses {
                 m_configStr = "... NLeading4 ..."
 
             will define :code:`int m_numLeading = 4`.
+
     @endrst
    */
   class IParticleInfoSwitch : public InfoSwitch {
@@ -243,6 +247,7 @@ namespace HelperClasses {
         m_effSF        effSF        exact
         m_energyLoss   energyLoss   exact
         ============== ============ =======
+
     @endrst
    */
   class MuonInfoSwitch : public IParticleInfoSwitch {
@@ -254,6 +259,14 @@ namespace HelperClasses {
     bool m_trackhitcont;
     bool m_effSF;
     bool m_energyLoss;
+    //std::map<std::string,bool> m_recoWPsMap;
+    //std::map<std::string,bool> m_isolWPsMap;
+    //std::map<std::string,bool> m_trigWPsMap;
+    
+    std::vector< std::string > m_recoWPs;
+    std::vector< std::string > m_isolWPs;
+    std::vector< std::string > m_trigWPs;
+    
     MuonInfoSwitch(const std::string configStr) : IParticleInfoSwitch(configStr) { initialize(); };
     virtual ~MuonInfoSwitch() {}
   protected:
@@ -273,7 +286,37 @@ namespace HelperClasses {
         m_trackparams  trackparams  exact
         m_trackhitcont trackhitcont exact
         m_effSF        effSF        exact
+
+        m_PIDWPs["LooseAndBLayerLLH"]            LooseAndBLayerLLH           exact
+        m_PIDWPs["MediumLLH"]                    MediumLLH                   exact
+        m_PIDWPs["TightLLH"]                     TightLLH                    exact
+
+        m_isolWPs["isolFixedCutLoose"]          isolFixedCutLoose           exact
+        m_isolWPs["isolFixedCutTight"]          isolFixedCutTight           exact
+        m_isolWPs["isolFixedCutTightTrackOnly"] isolFixedCutTightTrackOnly  exact
+        m_isolWPs["isolGradient"]               isolGradient                exact
+        m_isolWPs["isolGradientLoose"]          isolGradientLoose           exact
+        m_isolWPs["isolLoose"]                  isolLoose                   exact
+        m_isolWPs["isolLooseTrackOnly"]         isolLooseTrackOnly          exact
+        m_isolWPs["isolTight"]                  isolTight                   exact
+        m_isolWPs[""]                           isolNoRequirement           exact
+
+        m_trigWPs[DI_E_2015_e12_lhloose_L1EM10VH_2016_e15_lhvloose_nod0_L1EM13VH]      DI_E_2015_e12_lhloose_L1EM10VH_2016_e15_lhvloose_nod0_L1EM13VH   exact
+        m_trigWPs[DI_E_2015_e12_lhloose_L1EM10VH_2016_e17_lhvloose_nod0]               DI_E_2015_e12_lhloose_L1EM10VH_2016_e17_lhvloose_nod0            exact
+        m_trigWPs[DI_E_2015_e17_lhloose_2016_e17_lhloose]                              DI_E_2015_e17_lhloose_2016_e17_lhloose                           exact
+        m_trigWPs[MULTI_L_2015_e7_lhmedium_2016_e7_lhmedium_nod0]                      MULTI_L_2015_e7_lhmedium_2016_e7_lhmedium_nod0                   exact
+        m_trigWPs[MULTI_L_2015_e12_lhloose_2016_e12_lhloose_nod0]                      MULTI_L_2015_e12_lhloose_2016_e12_lhloose_nod0                   exact
+        m_trigWPs[MULTI_L_2015_e17_lhloose_2016_e17_lhloose_nod0]                      MULTI_L_2015_e17_lhloose_2016_e17_lhloose_nod0                   exact
+        m_trigWPs[MULTI_L_2015_e24_lhmedium_L1EM20VHI_2016_e24_lhmedium_nod0_L1EM20VHI]      MULTI_L_2015_e24_lhmedium_L1EM20VHI_2016_e24_lhmedium_nod0_L1EM20VHI        exact
+        m_trigWPs[MULTI_L_2015_e24_lhmedium_L1EM20VHI_2016_e26_lhmedium_nod0_L1EM22VHI]      MULTI_L_2015_e24_lhmedium_L1EM20VHI_2016_e26_lhmedium_nod0_L1EM22VHI        exact
+        m_trigWPs[SINGLE_E_2015_e24_lhmedium_L1EM20VH_OR_e60_lhmedium_OR_e120_lhloose_2016_e24_lhtight_nod0_ivarloose_OR_e60_lhmedium_nod0_OR_e140_lhloose_nod0]   SINGLE_E_2015_e24_lhmedium_L1EM20VH_OR_e60_lhmedium_OR_e120_lhloose_2016_e24_lhtight_nod0_ivarloose_OR_e60_lhmedium_nod0_OR_e140_lhloose_nod0   exact
+        m_trigWPs[SINGLE_E_2015_e24_lhmedium_L1EM20VH_OR_e60_lhmedium_OR_e120_lhloose_2016_e26_lhtight_nod0_ivarloose_OR_e60_lhmedium_nod0_OR_e140_lhloose_nod0]   SINGLE_E_2015_e24_lhmedium_L1EM20VH_OR_e60_lhmedium_OR_e120_lhloose_2016_e26_lhtight_nod0_ivarloose_OR_e60_lhmedium_nod0_OR_e140_lhloose_nod0   exact
+        m_trigWPs[TRI_E_2015_e9_lhloose_2016_e9_lhloose_nod0_                          TRI_E_2015_e9_lhloose_2016_e9_lhloose_nod0                       exact
+        m_trigWPs[TRI_E_2015_e9_lhloose_2016_e9_lhmedium_nod0]                         TRI_E_2015_e9_lhloose_2016_e9_lhmedium_nod0                      exact
+        m_trigWPs[TRI_E_2015_e17_lhloose_2016_e17_lhloose_nod0]                        TRI_E_2015_e17_lhloose_2016_e17_lhloose_nod0                     exact
+        m_trigWPs[TRI_E_2015_e17_lhloose_2016_e17_lhmedium_nod0]                       TRI_E_2015_e17_lhloose_2016_e17_lhmedium_nod0                    exact
         ============== ============ =======
+
     @endrst
    */
   class ElectronInfoSwitch : public IParticleInfoSwitch {
@@ -284,6 +327,9 @@ namespace HelperClasses {
     bool m_trackparams;
     bool m_trackhitcont;
     bool m_effSF;
+    std::vector< std::string > m_PIDWPs;
+    std::vector< std::string > m_isolWPs;
+    std::vector< std::string > m_trigWPs;
     ElectronInfoSwitch(const std::string configStr) : IParticleInfoSwitch(configStr) { initialize(); };
     virtual ~ElectronInfoSwitch() {}
   protected:
@@ -299,13 +345,16 @@ namespace HelperClasses {
         ============== ============ =======
         m_isolation    isolation    exact
         m_PID          PID          exact
+        m_purity       purity       exact
         ============== ============ =======
+
     @endrst
    */
   class PhotonInfoSwitch : public IParticleInfoSwitch {
   public:
     bool m_isolation;
     bool m_PID;
+    bool m_purity;
     PhotonInfoSwitch(const std::string configStr) : IParticleInfoSwitch(configStr) { initialize(); }
     virtual ~PhotonInfoSwitch() {}
   protected:
@@ -320,6 +369,8 @@ namespace HelperClasses {
         Parameter        Pattern        Match
         ================ ============== =======
         m_substructure   substructure   exact
+        m_bosonCount     bosonCount     exact
+        m_VTags          VTags          exact
         m_rapidity       rapidity       exact
         m_clean          clean          exact
         m_energy         energy         exact
@@ -340,26 +391,29 @@ namespace HelperClasses {
         m_sfFTagFix      sfFTagFix      partial
         m_sfFTagFlt      sfFTagFlt      partial
         m_area           area           exact
+        m_JVC            JVC            exact
         m_tracksInJet    tracksInJet    partial
+        m_trackJetName   trackJetName   partial
         m_hltVtxComp     hltVtxComp     exact
         m_charge         charge         exact
+        m_vsLumiBlock    vsLumiBlock    exact
         ================ ============== =======
 
         .. note::
-            ``sfFTagFix`` and ``sfFTagFlt`` require a string of numbers pairwise ``AABB..MM..YYZZ`` succeeding it. This will create a vector of numbers (AA, BB, CC, ..., ZZ) associated with that variable.
 
-            For example::
+            ``sfFTagFix`` and ``sfFTagFlt`` require a string of numbers pairwise ``AABB..MM..YYZZ`` succeeding it. This will create a vector of numbers (AA, BB, CC, ..., ZZ) associated with that variable. For example::
 
                 m_configStr = "... sfFTagFix010203 ..."
 
             will define :code:`std::vector<int> m_sfFTagFix = {1,2,3}`.
 
     @endrst
-
    */
   class JetInfoSwitch : public IParticleInfoSwitch {
   public:
     bool m_substructure;
+    bool m_bosonCount;
+    bool m_VTags;
     bool m_rapidity;
     bool m_clean;
     bool m_energy;
@@ -382,10 +436,14 @@ namespace HelperClasses {
     bool m_svDetails;
     bool m_ipDetails;
     bool m_tracksInJet;
+    bool m_trackJets;
     bool m_hltVtxComp;
     bool m_charge;
+    bool m_vsLumiBlock;
     bool m_area;
+    bool m_JVC;
     std::string      m_trackName;
+    std::string      m_trackJetName;
     std::vector<int> m_sfFTagFix;
     std::vector<int> m_sfFTagFlt;
     JetInfoSwitch(const std::string configStr) : IParticleInfoSwitch(configStr) { initialize(); };
@@ -402,12 +460,21 @@ namespace HelperClasses {
         Parameter        Pattern        Match
         ================ ============== =======
         m_kinematic      kinematic      exact
+        m_type           type           exact
+        m_bVtx           bVtx           exact
+        m_parents        parents        exact
+        m_children       children       exact
         ================ ============== =======
+
     @endrst
    */
   class TruthInfoSwitch : public InfoSwitch {
   public:
     bool m_kinematic;
+    bool m_type;
+    bool m_bVtx;
+    bool m_parents;
+    bool m_children;
     TruthInfoSwitch(const std::string configStr) : InfoSwitch(configStr) { initialize(); };
   protected:
     void initialize();
@@ -423,6 +490,7 @@ namespace HelperClasses {
         m_trackparams    trackparams    exact
         m_trackhitcont   trackhitcont   exact
         ================ ============== =======
+
     @endrst
    */
   class TauInfoSwitch : public IParticleInfoSwitch {
