@@ -114,7 +114,7 @@ public:
   TrigConf::xAODConfigTool*    m_trigConfTool;
   Trig::TrigDecisionTool*      m_trigDecTool;
 
-  void FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* event = nullptr,float wxs =1);
+  void FillEvent( const xAOD::EventInfo* eventInfo, xAOD::TEvent* event = nullptr);
 
   void FillTrigger( const xAOD::EventInfo* eventInfo );
   void FillJetTrigger();

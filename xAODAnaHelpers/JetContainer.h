@@ -25,7 +25,7 @@ namespace xAH {
     public:
       JetContainer(const std::string& name = "jet", const std::string& detailStr="", float units = 1e3, bool mc = false);
       virtual ~JetContainer();
-    
+
       virtual void setTree    (TTree *tree, std::string tagger="MV2c10");
       virtual void setBranches(TTree *tree);
       virtual void clear();

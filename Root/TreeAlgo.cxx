@@ -246,7 +246,7 @@ EL::StatusCode TreeAlgo :: execute ()
     if (std::find(photonSystNames.begin(), photonSystNames.end(), systName) != photonSystNames.end()) photonSuffix = systName;
     if (std::find(fatJetSystNames.begin(), fatJetSystNames.end(), systName) != fatJetSystNames.end()) fatJetSuffix = systName;
     
-    helpTree->FillEvent( eventInfo, m_event,wk()->metaData()->castDouble("weight_xs",1) );
+    helpTree->FillEvent( eventInfo, m_event/*,wk()->metaData()->castDouble("weight_xs",1)*/ );
 
     // Fill trigger information
     if ( !m_trigDetailStr.empty() )    {
